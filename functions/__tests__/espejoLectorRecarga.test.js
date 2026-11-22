@@ -45,8 +45,8 @@ function correr(guion) {
   return r.stdout.replace(/\r/g, '').trim().split('\n')
 }
 
-test('el lector es e1.6 y la recarga tiene sus archivos aparte del estado normal', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.6'$/m)
+test('el lector es e1.7 y la recarga tiene sus archivos aparte del estado normal', () => {
+  assert.match(LECTOR, /^\$VERSION = 'e1\.7'$/m)
   assert.ok(LECTOR.includes("$archivoRecarga = Join-Path $dir 'RECARGA'"))
   assert.ok(LECTOR.includes("$archivoRecargaEstado = Join-Path $dir 'recarga.json'"))
   // Los envíos de la recarga avanzan SU ancla, en recarga.json; estado.json no se toca.
@@ -55,19 +55,19 @@ test('el lector es e1.6 y la recarga tiene sus archivos aparte del estado normal
   assert.ok(LECTOR.includes('if ($rec) { $est = $rec.estado; $archivoEst = $archivoRecargaEstado }'))
 })
 
-test('el latido cabe en el contrato: ≤ 20 claves y la función acepta el de la recarga', () => {
+test('el latido cabe en el contrato: ≤ 24 claves (e1.7) y la función acepta el de la recarga', () => {
   const m = /\n {2}\$estC = @\{ (.*) \}\n/.exec(LECTOR)
   assert.ok(m, 'no está $estC')
   const claves = m[1].split('; ').map((p) => p.split(' = ')[0])
   assert.ok(claves.includes('recarga'))
-  assert.ok(claves.length <= 20, `latido con ${claves.length} claves`)
+  assert.ok(claves.length <= espejo.MAX_CLAVES_ESTADO, `latido con ${claves.length} claves`)
   const estado = Object.fromEntries(claves.map((k) => [k, 'x']))
   estado.recarga = 'terminada 34145 2026-11-17 00:00:01 a 2026-11-18 23:59:58'
   estado.rango = ['2026-11-17 00:00:00', '2026-11-19 00:00:00']
   const r = espejo.validarCuerpo({ v: 1, equipo: 'PC', informe: 'pieza', leidoEn: '2026-11-21T14:05:00-03:00', filas: [], estado })
   assert.deepStrictEqual(r.ok, true, r.error)
   // El latido inicial también lleva la clave.
-  assert.ok(LECTOR.includes("vivo = ''; recarga = ''; error = 'iniciando' }"))
+  assert.ok(LECTOR.includes("vivo = ''; recarga = ''; pantalla = "))
 })
 
 test('Texto-Recarga: avance, espera por «Limitar», cierre y nada', { skip: !PS && 'sin PowerShell' }, () => {

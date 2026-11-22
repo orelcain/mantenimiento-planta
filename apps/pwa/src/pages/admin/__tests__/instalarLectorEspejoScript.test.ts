@@ -61,28 +61,39 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     )
   })
 
-  it('e1.2: evita la suspensión sin tocar la pantalla ni el bloqueo (solo ES_CONTINUOUS | ES_SYSTEM_REQUIRED)', () => {
-    expect(S).toContain('SetThreadExecutionState([uint32]2147483649)')
+  it('e1.7: pide pantalla encendida y sin suspensión (ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED), sin simular entrada', () => {
+    expect(S).toContain('SetThreadExecutionState([uint32]2147483651)')
     expect(S.match(/SetThreadExecutionState\(\[uint32\]/g)?.length).toBe(1)
-    expect(S).not.toMatch(/powercfg|ScreenSaveTimeOut|InactivityTimeoutSecs|LockWorkStation/i)
+    // Las políticas de bloqueo solo se leen: nada de powercfg, LockWorkStation ni escrituras de registro.
+    expect(S).not.toMatch(/powercfg|LockWorkStation|Set-ItemProperty|New-ItemProperty|reg(\.exe)? add/i)
+    expect(S).toContain("'InactivityTimeoutSecs'")
   })
 
-  it('e1.2: con la sesión bloqueada no mueve el rango y lo informa en el latido', () => {
+  it('e1.2/e1.7: con la sesión bloqueada no mueve el rango; el error del ciclo ya no se tapa con el bloqueo', () => {
     expect(S).toContain('-and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }')
-    expect(S).toContain("if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }")
+    expect(S).not.toContain("$errC = 'pantalla-bloqueada'")
+    expect(S).toContain('pantalla = (Texto-Pantalla $script:pantallaPedida $script:bloqueada (Get-Date))')
   })
 
-  it('es la versión e1.6 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.6'"])
+  it('e1.7: abre Matrix minimizado y sin activar, con tope, y nunca lo cierra', () => {
+    expect(S).toContain(", 7, $false)")
+    expect(S).toContain("if ($veces.Count -ge 6) { return ('no-abre tope-diario ' + $veces.Count) }")
+    expect(S).not.toMatch(/Stop-Process[^\n]*(matrix|marelec)|CloseMainWindow|taskkill/i)
+  })
+
+  it('es la versión e1.7 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.7'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
 
-  it('e1.3: el latido no pasa de 20 claves (la función rechaza más)', () => {
+  it('e1.3/e1.7: el latido no pasa de 24 claves (la función rechaza más)', () => {
     const linea = S.split('\n').find((l) => l.includes('$estC = @{ version = $VERSION'))!
     const claves = linea.slice(linea.indexOf('@{') + 2, linea.lastIndexOf('}')).split(';').filter((x) => x.includes('='))
     expect(claves.length).toBeGreaterThan(15)
-    expect(claves.length).toBeLessThanOrEqual(20)
+    expect(claves.length).toBeLessThanOrEqual(24)
+    // e1.7: pantalla, Matrix abierto por el lector y huecos.
+    expect(linea).toContain('matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos) }')
     // e1.4: la lectura en vivo a pedido se informa en la clave «vivo».
     expect(linea).toContain('vivo = (Texto-Vivo); recarga = (Texto-Recarga ')
   })
