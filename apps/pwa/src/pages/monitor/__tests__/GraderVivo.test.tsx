@@ -96,7 +96,8 @@ describe('GraderVivo', () => {
     render(<GraderVivo {...entrada({})} />)
     expect(document.querySelector('[data-serie="grader"]')?.getAttribute('d')?.length).toBeGreaterThan(100)
     expect(screen.getByText('720.260.739')).toBeTruthy()
-    expect(screen.getByText(/el retraso medido en este turno \(r 0,\d\d\)/)).toBeTruthy()
+    expect(screen.getByText(/va \d+ min atrasada: es lo que tarda una pieza .* medido en este turno \(las curvas coinciden (bien|a medias)\)/)).toBeTruthy()
+    expect(screen.queryByText(/\(r 0,/)).toBeNull()
   })
 
   it('la línea manual muestra horas completas y la de las 08:00 sale', () => {
