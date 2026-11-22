@@ -234,3 +234,39 @@ export function rafagaFotocelula(porPieza: readonly PiezaP0[], umbral = RAFAGA_U
   }
   return mejor
 }
+
+export interface LineaDesglose {
+  rotulo: string
+  pz: number
+}
+
+const ROTULO_ESTIMADO: Partial<Record<CausaP0, string>> = {
+  'tenia-gate': 'Fotocélula o puerta (estimado)',
+  'calidad-sin-gate': 'Sin gate para su calidad (estimado)',
+  'sin-gate-peso': 'Sin gate para su peso (estimado)',
+  'calidad-d': 'Calidad D (estimado)',
+}
+
+/**
+ * Sublíneas de «Por qué va a P0» por dueño, sacadas de las mismas piezas que el total del dueño: exactas por motivo de
+ * Puerta 0 y estimadas por causa. Lo que no cae en una línea conocida va a «Otros», así cada dueño suma siempre su total
+ * (en producción el desglose de «calidad sin gate» listaba solo los 3 primeros y no sumaba: 134 contra 112).
+ */
+export function desgloseP0(r: ResumenP0): { mantencion: LineaDesglose[]; seteo: LineaDesglose[] } {
+  const orden: Record<'mantencion' | 'seteo', string[]> = {
+    mantencion: ['No leído por fotocélula', 'Puerta no preparada', ROTULO_ESTIMADO['tenia-gate']!],
+    seteo: ['Fuera de límites', ROTULO_ESTIMADO['calidad-sin-gate']!, ROTULO_ESTIMADO['sin-gate-peso']!, ROTULO_ESTIMADO['calidad-d']!],
+  }
+  const cuenta = { mantencion: new Map<string, number>(), seteo: new Map<string, number>() }
+  for (const p of r.porPieza) {
+    if (p.dueno === 'sin-reparto') continue
+    const conocida = p.exacto && p.motivo !== null
+      ? MOTIVO_CANONICO[norm(p.motivo)] ?? null
+      : p.causa !== null ? ROTULO_ESTIMADO[p.causa] ?? null : null
+    const k = conocida && orden[p.dueno].includes(conocida) ? conocida : 'Otros'
+    cuenta[p.dueno].set(k, (cuenta[p.dueno].get(k) ?? 0) + p.cantidad)
+  }
+  const lineas = (d: 'mantencion' | 'seteo'): LineaDesglose[] =>
+    [...orden[d], 'Otros'].map((rotulo) => ({ rotulo, pz: cuenta[d].get(rotulo) ?? 0 })).filter((x) => x.pz > 0)
+  return { mantencion: lineas('mantencion'), seteo: lineas('seteo') }
+}

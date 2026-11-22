@@ -18,7 +18,7 @@ import { Tarjeta } from './TarjetaVivo'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
-import { PRECISION_ESTIMADO_PCT } from '@/services/grader/espejo/motivoP0'
+import { PRECISION_ESTIMADO_PCT, desgloseP0 } from '@/services/grader/espejo/motivoP0'
 
 type Datos = DatosGraderVivo
 
@@ -141,9 +141,10 @@ function Curva({ d }: { d: Datos }) {
   const [ref, w] = useAncho<HTMLDivElement>()
   const h = w >= 600 ? 240 : 180
   const L = d.retraso.min
+  // «r» es la correlación de las dos curvas; en pantalla va en palabras (pedido del recorrido del 22-11).
   const sub = d.retraso.medido
-    ? `Grader corrido ${L} min, el retraso medido en este turno (r ${(d.retraso.r ?? 0).toFixed(2).replace('.', ',')}).` // decimal-tecnico: ya pasa a coma
-    : `Grader corrido ${L} min, ${RETRASO_REFERENCIA_FUENTE}: el turno aún no alcanza para medirlo.`
+    ? `La curva del grader va ${L} min atrasada: es lo que tarda una pieza en llegar de las Baader al grader, medido en este turno (las curvas coinciden ${(d.retraso.r ?? 0) >= 0.8 ? 'bien' : 'a medias'}).`
+    : `La curva del grader va ${L} min atrasada: lo que tarda una pieza en llegar de las Baader al grader, según la ${RETRASO_REFERENCIA_FUENTE}. Este turno aún no alcanza para medirlo.`
   return (
     <Tarjeta titulo="Piezas por minuto" sub={sub} icono={<Activity className={IC} />}>
       <div ref={ref} className="mt-3 w-full">
@@ -239,7 +240,7 @@ function P0Barras({ d }: { d: Datos }) {
   const [ref, w] = useAncho<HTMLDivElement>()
   const ts = d.p0
   const h = 130
-  const ml = 26
+  const ml = 38
   const mr = 8
   const mt = 8
   const mb = 20
@@ -262,7 +263,7 @@ function P0Barras({ d }: { d: Datos }) {
             {[0, Math.round(tope / 2), tope].map((v) => (
               <g key={v}>
                 <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
+                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v} %</text>
               </g>
             ))}
             {ts.map((t, i) => {
@@ -348,8 +349,10 @@ function CalibreCalidad({ d }: { d: Datos }) {
 
 function LineaManual({ d }: { d: Datos }) {
   const filas = d.manual
-  const tope = Math.max(1, ...filas.map((f) => Math.abs(f.diferencia)))
-  const total = filas.reduce((a, f) => a + f.diferencia, 0)
+  const leidas = filas.filter((f) => f.diferencia !== null)
+  const tope = Math.max(1, ...leidas.map((f) => Math.abs(f.diferencia ?? 0)))
+  const total = leidas.reduce((a, f) => a + (f.diferencia ?? 0), 0)
+  const sinLectura = filas.length - leidas.length
   return (
     <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora" icono={<Hand className={IC} />}>
       {!d.baader ? (
@@ -358,7 +361,13 @@ function LineaManual({ d }: { d: Datos }) {
         <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
       ) : (
         <div className="mt-3 space-y-1.5">
-          {filas.map((f) => (
+          {filas.map((f) => f.diferencia === null ? (
+            <div key={f.hora} data-hora={f.hora} data-sin-lectura className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
+              <span className="tabular-nums text-foreground/80">{f.hora}</span>
+              <span className="h-2.5 rounded-full border border-dashed border-border" aria-hidden />
+              <span className="text-right text-[12px] text-muted-foreground">sin lectura</span>
+            </div>
+          ) : (
             <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
               <span className="tabular-nums text-foreground/80">{f.hora}</span>
               <span className="relative h-2.5 rounded-full bg-muted">
@@ -372,7 +381,7 @@ function LineaManual({ d }: { d: Datos }) {
             </div>
           ))}
           <p className="pt-1.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
-            {filas.length} {filas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas. La hora en curso entra al cerrar.
+            {leidas.length} {leidas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas.{sinLectura > 0 ? ` ${sinLectura === 1 ? 'Una hora queda' : `${sinLectura} horas quedan`} fuera: el espejo no la leyó entera.` : ''} La hora en curso entra al cerrar.
           </p>
         </div>
       )}
@@ -407,15 +416,7 @@ function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
   const hTot = ultHora.reduce((s, x) => s + x.total, 0)
   const hG0 = ultHora.reduce((s, x) => s + x.g0, 0)
   const sub = `${milesPunto(r.pz)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
-  const motivo = (k: string) => r.motivos[k]
-  const fotocelula = motivo('No leído por fotocélula')
-  const puerta = motivo('Puerta no preparada')
-  const fuera = motivo('Fuera de límites')
-  const estimSeteo = (causa: string) => r.porPieza.filter((x) => x.dueno === 'seteo' && !x.exacto && x.causa === causa).reduce((s, x) => s + x.cantidad, 0)
-  const sinGateCal = estimSeteo('calidad-sin-gate')
-  const sinGatePeso = estimSeteo('sin-gate-peso')
-  const calD = estimSeteo('calidad-d')
-  const estMant = r.mantencion.estimadoPz
+  const desglose = desgloseP0(r)
   const pctExacto = r.pctExacto === null ? 0 : r.pctExacto
   // «exacto» del estimado = precisión medida de «tenía gate» contra Puerta 0; en mixto, cuántas piezas traen su motivo.
   const fuente = r.exactitud === 'exacto'
@@ -423,7 +424,7 @@ function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
     : r.exactitud === 'mixto'
       ? `motivo de Matrix en el ${Math.round(pctExacto)} % de las piezas · resto estimado`
       : `estimado · ${PRECISION_ESTIMADO_PCT} % exacto`
-  const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k} {milesPunto(n)}</p> : null)
+  const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k === 'No leído por fotocélula' ? 'Fotocélula' : k} {milesPunto(n)}</p> : null)
   return (
     <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>
       {r.pz === 0 ? (
@@ -431,14 +432,9 @@ function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
       ) : (
         <div className="mt-3 space-y-2.5">
           <FilaBarra rotulo="Mantención" n={r.mantencion.pz} pct={(r.mantencion.pz / tot) * 100} tono="var(--v2-mant)" detalle={`${milesPunto(Math.round(r.mantencion.kg))} kg`} />
-          {linea('Fotocélula', fotocelula?.pz ?? 0)}
-          {linea('Puerta no preparada', puerta?.pz ?? 0)}
-          {linea('Fotocélula o puerta (estimado)', estMant)}
+          {desglose.mantencion.map((x) => linea(x.rotulo, x.pz))}
           <FilaBarra rotulo="Seteo y pesca" n={r.seteo.pz} pct={(r.seteo.pz / tot) * 100} tono="var(--v2-ext)" detalle={`${milesPunto(Math.round(r.seteo.kg))} kg`} />
-          {linea('Fuera de límites', fuera?.pz ?? 0)}
-          {linea('Sin gate para su calidad (estimado)', sinGateCal)}
-          {linea('Sin gate para su peso (estimado)', sinGatePeso)}
-          {linea('Calidad D (estimado)', calD)}
+          {desglose.seteo.map((x) => linea(x.rotulo, x.pz))}
           {r.sinReparto.pz > 0 && <FilaBarra rotulo="Sin reparto" n={r.sinReparto.pz} pct={(r.sinReparto.pz / tot) * 100} tono="var(--v2-gris)" detalle="Sin peso: no se puede repartir." />}
           <p className="pt-1 text-[12px] leading-[16px] text-muted-foreground">Fuente: {fuente}.</p>
         </div>
@@ -590,7 +586,7 @@ function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
   const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v)} %`)
   return (
     <div className="overflow-x-auto">
-      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Contra los últimos 6 turnos (cierre)</p>
+      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Este turno (primera fila) y los 6 anteriores (cierre)</p>
       <table className="w-full text-[13px] leading-[18px] tabular-nums">
         <thead>
           <tr className="text-[12px] text-muted-foreground">
@@ -623,8 +619,8 @@ function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
 }
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
-export function GraderVivo(props: EntradaGraderVivo) {
-  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
+export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
+  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
   const d = useMemo(
     () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto }),
     [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
@@ -644,7 +640,7 @@ export function GraderVivo(props: EntradaGraderVivo) {
       {d.pesca?.seteo && (
         <>
           <SeteoGates s={d.pesca.seteo} />
-          <PescaPorPrograma s={d.pesca.seteo} />
+          <PescaPorPrograma s={d.pesca.seteo} publico={publico} />
         </>
       )}
       {d.pesca && (

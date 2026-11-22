@@ -133,7 +133,7 @@ describe('línea manual por hora', () => {
     const b = Array(170).fill(38)
     const h = lineaManualPorHora({ t0Ms: t0, pz, hastaMin: 170 }, b, 3)
     expect(h.map((x) => x.hora)).toEqual(['08:00', '09:00'])
-    expect(h[0]).toEqual({ hora: '08:00', grader: 2400, baader: 2280, diferencia: 120 })
+    expect(h[0]).toEqual({ hora: '08:00', grader: 2400, baader: 2280, diferencia: 120, sinLectura: false })
   })
   it('la hora en curso no entra aunque Shoplogix ya tenga esa hora entera (el lector va atrasado)', () => {
     const h = lineaManualPorHora({ t0Ms: t0, pz: Array(170).fill(40), hastaMin: 170 }, Array(260).fill(38), 3)

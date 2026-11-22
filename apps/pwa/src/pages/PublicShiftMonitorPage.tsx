@@ -8219,7 +8219,7 @@ function MonitorDelToken() {
               Turno cerrado
               {live.lastSyncAt && (
                 <>
-                  {' '}· último dato de las{' '}
+                  {' '}· última sincronización con planta a las{' '}
                   <span className="tabular-nums">
                     {new Date(live.lastSyncAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
                   </span>

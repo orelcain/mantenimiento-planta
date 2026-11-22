@@ -5,8 +5,8 @@ import { VIGENCIA_ALTA_MIN, esVersionValida, instaladorConAlta, versionDeLector 
 const CODIGO = 'a'.repeat(43)
 
 describe('versionDeLector', () => {
-  it('el instalador real declara e1.6', () => {
-    expect(versionDeLector(INSTALAR_LECTOR_ESPEJO_PS1)).toBe('e1.6')
+  it('el instalador real declara e1.7', () => {
+    expect(versionDeLector(INSTALAR_LECTOR_ESPEJO_PS1)).toBe('e1.7')
   })
 
   it('lee la línea aunque no sea la primera y tolere CRLF', () => {

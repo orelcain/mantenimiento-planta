@@ -61,3 +61,47 @@ describe('EspejoGraderCard: nunca «0 piezas» a secas', () => {
     expect(screen.queryByText(/ninguna de este turno/)).toBeNull()
   })
 })
+
+describe('EspejoGraderCard: vista pública y turno del monitor (22-11)', () => {
+  const T2 = { nombre: 'Turno 2', desde: '07:15', hasta: '14:50', piezas: 17836, g0: 412, baader: 16188 }
+  const INTERNOS = /sesión bloqueada|Poniéndose al día|Puerta 0|Matrix|lector|CH-MANT|Pieza pieza|Respaldo|Turno B/i
+
+  it.each(['otro-informe', 'sin-matrix', 'sin-tabla', 'licencia-en-pantalla', 'tope-10-min', 'sin-boton', 'invoke-fallo', 'tabla-inestable', 'tabla-cambio', 'excepcion', 'recarga-con-limite', 'pantalla-bloqueada', 'iniciando', 'codigo-nuevo'])('en público no muestra textos internos con el error «%s»', (codigo) => {
+    const { container } = render(
+      <EspejoGraderCard estado={estado({ error: codigo, parcial: true, pendientes: 300, limite: true })} vivo minutos={1} resumen={CON_PIEZAS} publico turnoMonitor={T2} />,
+    )
+    expect(container.textContent).not.toMatch(INTERNOS)
+  })
+
+  it('en público, sin lectura, tampoco nombra el equipo ni el respaldo', () => {
+    const { container } = render(<EspejoGraderCard estado={estado({ error: 'pantalla-bloqueada' })} vivo={false} minutos={40} resumen={CON_PIEZAS} publico turnoMonitor={T2} />)
+    expect(container.textContent).not.toMatch(/CH-MANT|Respaldo|sesión bloqueada/)
+  })
+
+  it('admin sigue viendo el aviso de sesión bloqueada y el avance', () => {
+    render(<EspejoGraderCard estado={estado({ error: 'pantalla-bloqueada', parcial: true })} vivo minutos={1} resumen={CON_PIEZAS} turnoMonitor={T2} />)
+    expect(screen.getByText(/sesión bloqueada/)).toBeTruthy()
+    expect(screen.getByText(/Poniéndose al día/)).toBeTruthy()
+  })
+
+  it('con el turno cerrado dice «Turno cerrado», no «Vivo», y oculta la lectura en vivo', () => {
+    render(<EspejoGraderCard estado={estado({})} vivo minutos={1} resumen={CON_PIEZAS} turnoEnCurso={false} turnoMonitor={T2} accion={<button>Leer en vivo</button>} />)
+    expect(screen.getByText('Turno cerrado')).toBeTruthy()
+    expect(screen.queryByText(/^Vivo/)).toBeNull()
+    expect(screen.queryByText('Leer en vivo')).toBeNull()
+  })
+
+  it('con el turno cerrado y el lector caído muestra lo que trajo el espejo, no «dejó de enviar»', () => {
+    render(<EspejoGraderCard estado={estado({})} vivo={false} minutos={300} resumen={CON_PIEZAS} turnoEnCurso={false} turnoMonitor={T2} publico />)
+    expect(screen.getByText('17.836 piezas')).toBeTruthy()
+    expect(screen.queryByText(/dejó de enviar/)).toBeNull()
+  })
+
+  it('usa el nombre, el horario y la cifra del encabezado (no la letra de Matrix ni la primera y última pieza)', () => {
+    render(<EspejoGraderCard estado={estado({})} vivo minutos={1} resumen={{ ...CON_PIEZAS, total: 17876, coincidencia: { letra: 'B', pct: 99 } }} publico turnoMonitor={T2} />)
+    expect(screen.getByText('17.836 piezas')).toBeTruthy()
+    expect(screen.getByText(/^Turno 2 · 07:15 → 14:50 · P0 2,3 %$/)).toBeTruthy()
+    expect(screen.getByText('16.188 piezas')).toBeTruthy()
+    expect(screen.getByText('3 Baader (Shoplogix)')).toBeTruthy()
+  })
+})

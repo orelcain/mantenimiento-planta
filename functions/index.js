@@ -1775,6 +1775,18 @@ exports.espejoGraderIngesta = onRequest(
         logger.warn('espejoGraderIngesta: llave revocada', prefijo)
         return res.status(403).json({ ok: false, detener: true })
       }
+      // e1.7 · GET ?conteos=AAAA-MM-DD,…: filas por hora del espejo de esa línea, para que el lector rellene huecos.
+      if (req.method === 'GET' && req.query.conteos !== undefined) {
+        const vc = espejoGraderMod.validarConteos(String(req.query.conteos))
+        if (!vc.ok) return res.status(400).json({ ok: false, error: vc.error })
+        const linea = typeof llaveDoc.linea === 'string' && llaveDoc.linea ? llaveDoc.linea : 'chonchi'
+        const conteos = {}
+        for (const f of vc.fechas) {
+          const snap = await db.collection('graderEspejo').doc(`${linea}__${f}`).collection('horas').get()
+          conteos[f] = espejoGraderMod.conteoPorHora(snap.docs.map((d) => ({ id: d.id, filas: d.get('filas') })))
+        }
+        return res.status(200).json({ ok: true, conteos })
+      }
       // GET ?lector=<versión>: entrega el lector publicado (bytes exactos; el lector verifica el sha256).
       if (req.method === 'GET') {
         const pedida = String(req.query.lector || '')
