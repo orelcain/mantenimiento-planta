@@ -26,6 +26,7 @@ import {
 } from '@/services/grader/espejo/espejoVersionLogica'
 import { INSTALAR_LECTOR_ESPEJO_PS1 } from './instalarLectorEspejoScript'
 import { COMANDO_REGISTRO_LECTOR, EstadoLectorEspejo } from './EstadoLectorEspejo'
+import { COMANDO_RECARGA } from '@/services/grader/espejo/espejoEstado'
 
 const NOMBRE_POR_DEFECTO = 'PC Matrix'
 
@@ -281,6 +282,26 @@ export function LectorEspejoCard() {
           </Button>
           <p className="text-xs text-muted-foreground">
             Pégalo en PowerShell en el PC de Matrix: muestra las últimas 25 líneas del registro del lector.
+          </p>
+        </div>
+
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-xs font-medium">Recargar días anteriores (desde e1.6)</p>
+          <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+            <li>En Matrix, «Pieza pieza Grader»: pon a mano el rango de los días que faltan (por ejemplo, de 00:00 del primer día a 00:00 del día siguiente al último) y desmarca «Limitar».</li>
+            <li>Pega el comando en PowerShell en el PC de Matrix. El lector lee todo el rango por tramos, sin repetir piezas; el avance sale arriba, en «Recarga de historia».</li>
+            <li>Cuando diga «terminada», vuelve el rango de Matrix a hoy (inicio hoy 00:00, fin pasado mañana 00:00). El lector sigue solo con el turno.</li>
+          </ol>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiar(COMANDO_RECARGA, 'Comando de recarga copiado')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar comando de recarga
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Un día completo tarda unos 5 minutos y, mientras dura, el lector no lee el turno en curso: hazlo fuera de producción si se puede. Para cancelar, borra el archivo RECARGA de esa carpeta.
           </p>
         </div>
       </CardContent>

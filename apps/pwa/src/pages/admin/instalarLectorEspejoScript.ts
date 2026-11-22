@@ -1,10 +1,10 @@
 /**
- * Instalador del lector del espejo del grader (e1.5) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, y acciona solo las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
+ * Instalador del lector del espejo del grader (e1.6) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, y acciona solo las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar». Con el archivo RECARGA lee entero el rango que se puso a mano (recarga de historia).
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader (e1.5). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Instalador del lector del espejo del grader (e1.6). Pegar TODO en PowerShell y Enter. Un solo pegado.
   # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
   # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
   # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
@@ -112,9 +112,15 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 # e1.4 — lectura en vivo a pedido: si la respuesta de un envío trae vivoSeg (botón «En vivo 15 min» del monitor), la
 # espera entre ciclos baja a 60 s hasta ese plazo (nunca menos: Matrix tarda ~12 s en recargar) y vuelve sola a
 # ESPEJO_CADA. El plazo se arma con los segundos que manda la función, no con el reloj de este PC. Latido: clave «vivo».
+# e1.6 — recarga puntual de historia: con el archivo <dir>\\RECARGA el lector lee ENTERO el rango que Orel puso a mano
+# en Matrix (sin el corte ESPEJO_HORAS_ATRAS), por tramos y lotes, con su propia ancla en <dir>\\recarga.json: el
+# estado normal (estado.json) no se toca. En recarga no mueve las fechas (solo desmarca «Limitar» y pulsa «Actualizar»
+# una vez) y no lee si «Limitar» sigue marcada. Al llegar al final borra RECARGA y recarga.json y vuelve solo al modo
+# normal, buscando su ancla por contenido. Borrar RECARGA a medias la cancela. El servidor no duplica: cada fila lleva
+# su #n por segundo y se une con arrayUnion por hora. Latido: clave «recarga».
 
 $ErrorActionPreference = 'Continue'
-$VERSION = 'e1.5'
+$VERSION = 'e1.6'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -159,6 +165,9 @@ $archivoLog = Join-Path $dir 'lector.log'
 $archivoEstado = Join-Path $dir 'estado.json'
 $archivoDetener = Join-Path $dir 'DETENER'
 $archivoLlave = Join-Path $dir 'llave.dat'
+# e1.6: orden de recarga de historia y el ancla propia de esa recarga.
+$archivoRecarga = Join-Path $dir 'RECARGA'
+$archivoRecargaEstado = Join-Path $dir 'recarga.json'
 # E1.3: el vigilante (tarea programada) lee latido.txt y lector.pid; REVOCADA le dice que borre la tarea;
 # lector-nuevo.ps1 + nuevo.json son una versión ya bajada y verificada que el vigilante pone en marcha.
 $archivoLatido = Join-Path $dir 'latido.txt'
@@ -218,11 +227,11 @@ function Lee-Llave {
 function Estado-Nuevo {
   return @{ ancla = $null; piezas = 0; primera = ''; ultima = ''; sec = ''; conteos = @() }
 }
-function Carga-Estado {
+function Carga-Estado([string]$archivo = $archivoEstado) {
   $e = Estado-Nuevo
-  if (-not (Test-Path -LiteralPath $archivoEstado)) { return $e }
+  if (-not (Test-Path -LiteralPath $archivo)) { return $e }
   try {
-    $j = Get-Content -LiteralPath $archivoEstado -Raw -Encoding UTF8 | ConvertFrom-Json
+    $j = Get-Content -LiteralPath $archivo -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($j.ancla) { $e.ancla = @{ idx = [int]$j.ancla.idx; texto = [string]$j.ancla.texto } }
     $e.piezas = [int]$j.piezas
     $e.primera = [string]$j.primera
@@ -232,18 +241,18 @@ function Carga-Estado {
     foreach ($p in @($j.conteos)) { if ($p) { $lista.Add(@{ k = [string]$p.k; n = [int]$p.n }) } }
     $e.conteos = $lista.ToArray()
   } catch {
-    Log 'estado.json ilegible: se relee todo'
+    Log ((Split-Path -Leaf $archivo) + ' ilegible: se relee todo')
     return (Estado-Nuevo)
   }
   return $e
 }
-function Guarda-Estado($e) {
+function Guarda-Estado($e, [string]$archivo = $archivoEstado) {
   try {
     $txt = ConvertTo-Json -InputObject $e -Depth 5
-    $tmp = $archivoEstado + '.tmp'
+    $tmp = $archivo + '.tmp'
     [IO.File]::WriteAllText($tmp, $txt, $UTF8)
-    Move-Item -LiteralPath $tmp -Destination $archivoEstado -Force
-  } catch { Log ('estado.json no guardado: ' + $_.Exception.Message) }
+    Move-Item -LiteralPath $tmp -Destination $archivo -Force
+  } catch { Log ((Split-Path -Leaf $archivo) + ' no guardado: ' + $_.Exception.Message) }
 }
 
 # ---- UI Automation: búsqueda (reutiliza la forma de la prueba de vida) ----
@@ -439,7 +448,8 @@ function Rango-Deseado($estado) {
 # Antes de «Actualizar»: desmarca «Limitar» (solo si está marcada) y escribe las 2 fechas (solo si cambian).
 # e1.5: la casilla va por su cuenta. Un fallo de las fechas no la apaga, y ella se revisa en cada «Actualizar».
 # Devuelve $null si no tocó nada; si tocó, lo necesario para verificar y deshacer (movio = las fechas cambiaron).
-function Ajusta-Rango($el, $estado) {
+# e1.6: $soloCasilla (recarga de historia) no toca las fechas: el rango lo puso Orel a mano.
+function Ajusta-Rango($el, $estado, [bool]$soloCasilla = $false) {
   $ctl = Controles-Rango (Ventana-Raiz $el)
   if ($ctl.error) { $script:ajuste = $ctl.error; return $null }
   $toco = $false
@@ -451,7 +461,7 @@ function Ajusta-Rango($el, $estado) {
   }
   $movio = $false
   $q = Rango-Deseado $estado
-  if (-not $script:fechasApagadas) { $movio = Mueve-Fechas $ctl $q }
+  if (-not $script:fechasApagadas -and -not $soloCasilla) { $movio = Mueve-Fechas $ctl $q }
   $script:ajuste = Texto-Ajuste
   if (-not $toco -and -not $movio) { return $null }
   return @{ ctl = $ctl; orig = $script:rangoOriginal; q = $q; movio = $movio }
@@ -609,8 +619,8 @@ function Desde-Corte($gp, [int]$filas, [string]$corte) {
 # Lee un tramo de filas nuevas (desde el ancla) o, si el ancla no calza, desde el corte por antigüedad.
 # El tramo termina al llegar a la última fila, a $script:topeTramoSeg segundos o a $LOTE_MAX filas-pieza;
 # en los dos últimos casos parcial=$true y hastaIdx/hastaTexto marcan la última fila recorrida.
-# Devuelve $null si la tabla cambió durante la lectura.
-function Lee-Tabla($gp, [int]$filas, $estado, $reloj) {
+# Devuelve $null si la tabla cambió durante la lectura. e1.6: $sinCorte (recarga de historia) lee desde la fila 0.
+function Lee-Tabla($gp, [int]$filas, $estado, $reloj, [bool]$sinCorte = $false) {
   $desde = 0
   $relectura = $false
   $semilla = Nuevo-Diccionario
@@ -631,7 +641,7 @@ function Lee-Tabla($gp, [int]$filas, $estado, $reloj) {
       $relectura = $true
     }
   }
-  if (-not $anclaOk -and $script:horasAtras -gt 0) {
+  if (-not $anclaOk -and $script:horasAtras -gt 0 -and -not $sinCorte) {
     $corte = (Get-Date).AddHours(-$script:horasAtras).ToString('yyyy-MM-dd HH:mm:ss')
     $desde = Desde-Corte $gp $filas $corte
   }
@@ -790,8 +800,10 @@ function Envia($filas, $estC) {
 }
 
 # Un ciclo completo: pulsa Actualizar, espera la estabilización, lee y envía. Devuelve un resumen para el log.
-function Ciclo($estado, $reloj, [bool]$refrescar) {
-  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
+# e1.6: $recarga = lectura entera del rango de Matrix (solo casilla, sin corte, no lee con «Limitar» marcada);
+# $reanclar = buscar el ancla por contenido aunque no se haya tocado nada (al volver de una recarga).
+function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool]$reanclar = $false) {
+  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = ''; reancla = '' }
   $foto = Foto
   $res.rango = $foto.rango
   $res.limite = $foto.limite
@@ -806,7 +818,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
     $boton = Boton-Actualizar (Ventana-De $foto.el)
     if (-not $boton) { $res.error = 'sin-boton'; return $res }
     # Con la sesión bloqueada no se mueve el rango ni la casilla. e1.5: un fallo de las fechas ya no apaga la casilla.
-    if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }
+    if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }
     try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     catch { $res.error = 'invoke-fallo'; return $res }
 
@@ -833,28 +845,32 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
       continue
     }
     # Con el rango corto la tabla puede quedar vacía de verdad: entonces 0 filas también vale como estable.
-    if ($n -eq $ult -and ($n -gt 0 -or $aj)) { $iguales++ } else { $iguales = 1; $ult = $n }
+    if ($n -eq $ult -and ($n -gt 0 -or $aj -or $recarga)) { $iguales++ } else { $iguales = 1; $ult = $n }
     if ($iguales -ge 3) { break }
     if ($t0.Elapsed.TotalSeconds -gt 120) { $res.error = 'tabla-inestable'; return $res }
     Espera 2
   }
 
   # Tras mover el rango: comprobar que Matrix lo tomó y buscar el ancla por contenido (su índice cambió).
-  if ($aj) {
-    Verifica-Ajuste $aj $foto.gp $n
+  if ($aj) { Verifica-Ajuste $aj $foto.gp $n }
+  # e1.6: con «Limitar» marcada el informe se corta en 10 000 filas: una recarga así daría un día por completo sin
+  # estarlo. No lee; la recarga sigue pendiente hasta que la casilla quede desmarcada.
+  if ($recarga -and $foto.limite) { $res.error = 'recarga-con-limite'; return $res }
+  if ($aj -or $reanclar) {
     $ra = Re-Ancla $foto.gp $n $estado
+    $res.reancla = $ra
     Log ('reancla=' + $ra)
   }
 
   # Lectura, con un reintento si la tabla cambió mientras se leía.
-  $lec = Lee-Tabla $foto.gp $n $estado $reloj
+  $lec = Lee-Tabla $foto.gp $n $estado $reloj $recarga
   if (-not $lec) {
     Espera 2
     $foto = Foto
     if ($foto.error) { $res.error = $foto.error; return $res }
     $n = [int]$foto.gp.Current.RowCount
-    if ($aj) { [void](Re-Ancla $foto.gp $n $estado) }
-    $lec = Lee-Tabla $foto.gp $n $estado $reloj
+    if ($aj -or $reanclar) { [void](Re-Ancla $foto.gp $n $estado) }
+    $lec = Lee-Tabla $foto.gp $n $estado $reloj $recarga
     if (-not $lec) { $res.error = 'tabla-cambio'; return $res }
   }
   $res.ftabla = $n
@@ -877,6 +893,22 @@ function Texto-Vivo {
   return ''
 }
 function Fecha-Hora($cel) { return ('{0} {1}' -f $cel[0], $cel[1]) }
+
+# ---- e1.6: recarga puntual de historia ----
+# Marca del archivo RECARGA (hora de escritura): sirve para no volver a empezar con el mismo archivo si no se pudo borrar.
+function Marca-Recarga {
+  try { return [string](Get-Item -LiteralPath $archivoRecarga -ErrorAction Stop).LastWriteTimeUtc.Ticks } catch { return '' }
+}
+
+# Clave «recarga» del latido (texto <= 200): '' sin recarga | 'leyendo <recorridas>/<filas> <enviadas>' |
+# 'con-limite' (no lee con «Limitar» marcada) | 'terminada <enviadas> <primera> a <ultima>' | 'cancelada <enviadas>'.
+function Texto-Recarga($rec, [string]$cierre, [int]$recorridas, [int]$filas, [string]$errorCiclo) {
+  if ($rec) {
+    if ($errorCiclo -eq 'recarga-con-limite') { return 'con-limite' }
+    return ('leyendo ' + $recorridas + '/' + $filas + ' ' + [int]$rec.enviadas)
+  }
+  return [string]$cierre
+}
 
 # ---------- Arranque ----------
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -903,6 +935,11 @@ try {
 $script:bloqueada = $false
 $script:actualizar = $null
 $script:vivoFin = $null
+# e1.6: recarga en curso (@{ estado; enviadas; marca; avance }), su cierre para el latido y el re-anclaje al volver.
+$script:recarga = $null
+$script:recargaCierre = ''
+$script:recargaHecha = ''
+$script:reanclar = $false
 try { [IO.File]::WriteAllText($archivoPid, [string]$PID, $UTF8) } catch { }
 $script:arranque = Modo-Arranque
 $script:actualiz = ''
@@ -915,7 +952,7 @@ Log ('Arranque ' + $VERSION + ' (' + $script:arranque + '): equipo=' + $equipo +
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; error = 'iniciando' }
+$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; recarga = ''; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
 Escribe-Latido 'inicio'
@@ -929,10 +966,34 @@ while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
   $res = $null
   $script:bloqueada = Sesion-Bloqueada
+  # e1.6: empieza, sigue o se cancela la recarga de historia según el archivo RECARGA.
+  $marcaRec = Marca-Recarga
+  if ($marcaRec -and -not $script:recarga -and $marcaRec -ne $script:recargaHecha) {
+    $script:recarga = @{ estado = (Carga-Estado $archivoRecargaEstado); enviadas = 0; marca = $marcaRec; avance = 0; reanclar = $false }
+    $script:recarga.reanclar = [bool]$script:recarga.estado.ancla
+    # Al retomar, lo ya enviado sale de recarga.json (sus «piezas»), no vuelve a 0.
+    $script:recarga.enviadas = [int]$script:recarga.estado.piezas
+    $script:recargaCierre = ''
+    $refrescar = $true
+    Log ('Recarga de historia: lee entero el rango que muestra Matrix, sin corte por antigüedad' + $(if ($script:recarga.reanclar) { ' (sigue la que quedó a medias)' } else { '' }) + '.')
+  } elseif (-not $marcaRec -and $script:recarga) {
+    Log ('Recarga cancelada (se borró RECARGA): ' + $script:recarga.enviadas + ' filas-pieza enviadas. Vuelve al modo normal.')
+    $script:recargaCierre = 'cancelada ' + [int]$script:recarga.enviadas
+    $script:recarga = $null
+    try { Remove-Item -LiteralPath $archivoRecargaEstado -Force -ErrorAction Stop } catch { }
+    $script:reanclar = $true
+    $refrescar = $true
+  }
+  $rec = $script:recarga
+  # El estado que se lee y avanza: el de la recarga (recarga.json) o el normal (estado.json), nunca los dos.
+  $est = $estado
+  $archivoEst = $archivoEstado
+  if ($rec) { $est = $rec.estado; $archivoEst = $archivoRecargaEstado }
+  $reanclarCiclo = $(if ($rec) { [bool]$rec.reanclar } else { [bool]$script:reanclar })
   try {
     Revisa-Detener
     # Ciclo puede dejar salida suelta en el pipeline: se toma solo el resumen (hashtable).
-    $res = @(Ciclo $estado $reloj $refrescar) | Where-Object { $_ -is [hashtable] } | Select-Object -Last 1
+    $res = @(Ciclo $est $reloj $refrescar ([bool]$rec) $reanclarCiclo) | Where-Object { $_ -is [hashtable] } | Select-Object -Last 1
   } catch {
     $msg = [string]$_.Exception.Message
     if ($msg -eq 'DETENER') {
@@ -944,24 +1005,31 @@ while (-not $terminar) {
     # Se conserva lo que la última Foto válida alcanzó a ver.
     $ftErr = 0; $rangoErr = [string[]]@(); $limiteErr = $false
     if ($script:ultFoto) { $ftErr = [int]$script:ultFoto.ftabla; $rangoErr = [string[]]@($script:ultFoto.rango); $limiteErr = [bool]$script:ultFoto.limite }
-    $res = @{ error = $(if ($msg -eq 'tope-10-min') { 'tope-10-min' } else { 'excepcion' }); ftabla = $ftErr; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = $rangoErr; limite = $limiteErr; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
+    $res = @{ error = $(if ($msg -eq 'tope-10-min') { 'tope-10-min' } else { 'excepcion' }); ftabla = $ftErr; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = $rangoErr; limite = $limiteErr; primera = $est.primera; ultima = $est.ultima; piezas = $est.piezas; fin = ''; reancla = '' }
   }
 
   $items = @()
   if ($res.lec) { $items = $res.lec.items.ToArray() }
   $base = $res.base
-  if ($null -eq $base) { $base = $estado.piezas }
+  if ($null -eq $base) { $base = $est.piezas }
   $piezas = $base + $items.Count
   if ($res.lec -and $res.lec.relectura) { $piezas = $items.Count }
-  $primera = $estado.primera
+  $primera = $est.primera
   if (($res.lec -and $res.lec.relectura) -or -not $primera) { $primera = '' }
   if ($items.Count -gt 0 -and -not $primera) { $primera = (Fecha-Hora ($items[0].cel)) }
-  $ultima = $estado.ultima
+  $ultima = $est.ultima
   if ($items.Count -gt 0) { $ultima = (Fecha-Hora ($items[$items.Count - 1].cel)) }
   # Con la sesión bloqueada, si no pudo leer, el motivo que se informa es el bloqueo (el original queda en el log).
   $errC = [string]$res.error
   if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }
-  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial; vivo = (Texto-Vivo) }
+  # e1.6: en recarga el latido sigue contando el turno normal (piezas, primera, última) y va «parcial»: el monitor
+  # no da por leídos los minutos de hoy mientras el lector mira días viejos.
+  $latPiezas = $piezas; $latPrimera = $primera; $latUltima = $ultima; $latParcial = [bool]$res.parcial
+  if ($rec) {
+    $latPiezas = $estado.piezas; $latPrimera = $estado.primera; $latUltima = $estado.ultima; $latParcial = $true
+    if ($res.lec) { $rec.avance = [int]$res.lec.hastaIdx + 1 }
+  }
+  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$latPiezas; primera = $latPrimera; ultima = $latUltima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = $latParcial; vivo = (Texto-Vivo); recarga = (Texto-Recarga $rec $script:recargaCierre $(if ($rec) { [int]$rec.avance } else { 0 }) ([int]$res.ftabla) ([string]$res.error)) }
 
   $enviadas = 0
   $fin = ''
@@ -976,15 +1044,16 @@ while (-not $terminar) {
       for ($i = $inicio; $i -le $ultimo; $i++) { $lote.Add((($items[$i].cel) -join "\`t") + "\`t#" + [string]$items[$i].ord) }
       $resp = Envia ($lote.ToArray()) $estC
       if ($resp -ne 'ok') { if ($resp -eq 'fin') { $fin = 'fin' }; break }
-      # Solo tras el 200: avanza el ancla, los conteos y las piezas.
-      $estado.ancla = @{ idx = [int]$items[$ultimo].idx; texto = [string]$items[$ultimo].texto }
-      $estado.conteos = Conteos-Hasta $res.lec $ultimo
-      $estado.sec = [string]$items[$ultimo].sec
-      $estado.piezas = $base + $ultimo + 1
-      $estado.primera = $primera
-      $estado.ultima = (Fecha-Hora ($items[$ultimo].cel))
-      Guarda-Estado $estado
+      # Solo tras el 200: avanza el ancla, los conteos y las piezas (de la recarga o del modo normal).
+      $est.ancla = @{ idx = [int]$items[$ultimo].idx; texto = [string]$items[$ultimo].texto }
+      $est.conteos = Conteos-Hasta $res.lec $ultimo
+      $est.sec = [string]$items[$ultimo].sec
+      $est.piezas = $base + $ultimo + 1
+      $est.primera = $primera
+      $est.ultima = (Fecha-Hora ($items[$ultimo].cel))
+      Guarda-Estado $est $archivoEst
       $enviadas += ($ultimo - $inicio + 1)
+      if ($rec) { $rec.enviadas = [int]$est.piezas }
       $inicio = $ultimo + 1
     }
   }
@@ -995,23 +1064,43 @@ while (-not $terminar) {
   $envioOk = ($enviadas -eq $items.Count)
   if ($res.lec -and $res.lec.parcial -and -not $fin -and $envioOk) {
     $idxActual = -1
-    if ($estado.ancla -and ($items.Count -gt 0 -or -not $res.lec.relectura)) { $idxActual = [int]$estado.ancla.idx }
+    if ($est.ancla -and ($items.Count -gt 0 -or -not $res.lec.relectura)) { $idxActual = [int]$est.ancla.idx }
     if ([int]$res.lec.hastaIdx -gt $idxActual) {
-      $estado.ancla = @{ idx = [int]$res.lec.hastaIdx; texto = [string]$res.lec.hastaTexto }
-      if ($idxActual -lt 0 -and $res.lec.relectura) { $estado.conteos = @(); $estado.sec = ''; $estado.piezas = 0; $estado.primera = ''; $estado.ultima = '' }
-      Guarda-Estado $estado
+      $est.ancla = @{ idx = [int]$res.lec.hastaIdx; texto = [string]$res.lec.hastaTexto }
+      if ($idxActual -lt 0 -and $res.lec.relectura) { $est.conteos = @(); $est.sec = ''; $est.piezas = 0; $est.primera = ''; $est.ultima = '' }
+      Guarda-Estado $est $archivoEst
     }
+  }
+
+  if ($rec) {
+    # El re-anclaje de una recarga retomada se intenta una vez; después manda el índice.
+    if ($res.lec) { $rec.reanclar = $false }
+    # Llegó al final del rango sin error y con todo enviado: termina la recarga y vuelve solo al modo normal.
+    if ($res.lec -and -not $res.lec.parcial -and -not [string]$res.error -and $envioOk -and -not $fin) {
+      $script:recargaCierre = ('terminada ' + [int]$rec.enviadas + ' ' + [string]$est.primera + ' a ' + [string]$est.ultima).Trim()
+      Log ('Recarga terminada: ' + [int]$rec.enviadas + ' filas-pieza enviadas (' + [string]$est.primera + ' a ' + [string]$est.ultima + '). Vuelve al modo normal; pon de nuevo en Matrix el rango de hoy.')
+      try { Remove-Item -LiteralPath $archivoRecarga -Force -ErrorAction Stop } catch { Log ('No se pudo borrar RECARGA: ' + $_.Exception.Message + '. No se vuelve a recargar con el mismo archivo.') }
+      try { Remove-Item -LiteralPath $archivoRecargaEstado -Force -ErrorAction Stop } catch { }
+      $script:recargaHecha = [string]$rec.marca
+      $script:recarga = $null
+      $script:reanclar = $true
+    }
+  } elseif ($script:reanclar -and $res.lec -and ($res.lec.anclaOk -or $items.Count -gt 0 -or -not $estado.ancla)) {
+    # De vuelta en el modo normal: el ancla volvió a aparecer (o se reemplazó al enviar). Hasta entonces, cada ciclo la
+    # busca por contenido; mientras Matrix siga con el rango viejo no hay filas nuevas y el ancla no se pierde.
+    $script:reanclar = $false
   }
 
   $seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1)
   $leidas = $items.Count
-  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' vivo=' + [bool]((Texto-Vivo) -ne '') + ' error=' + [string]$res.error)
+  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' vivo=' + [bool]((Texto-Vivo) -ne '') + ' recarga=' + [bool]$rec + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
   # «ciclo» (confirma una versión nueva) solo si la función aceptó el envío y el ciclo no reventó; si no, «vivo».
   $tipoLat = 'vivo'
   if ($resp -eq 'ok' -and @('excepcion', 'tope-10-min') -notcontains [string]$res.error) { $tipoLat = 'ciclo' }
   Escribe-Latido $tipoLat
-  if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { } else {
+  # Una versión nueva no se pone en marcha a mitad de un tramo ni de una recarga (la recarga la retoma igual al volver).
+  if (($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) -or $script:recarga) { } else {
     $ra = Revisa-Actualizacion
     if ($ra) { $script:actualiz = $ra }
     if ($ra -like 'bajada *') { $terminar = $true; break }
@@ -1019,7 +1108,9 @@ while (-not $terminar) {
   # Si quedó a medias (sin error ni fallo de envío), el siguiente ciclo sigue ya, sin pulsar «Actualizar».
   $espera = Espera-Ciclo $cada $script:vivoFin (Get-Date)
   $refrescar = $true
+  # e1.6: una recarga que no pudo leer (Matrix ocupado, «Limitar» marcada) reintenta en 1 min, no en 5.
   if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { $espera = 5; $refrescar = $false }
+  elseif ($script:recarga) { $espera = [math]::Min($espera, $ESPERA_VIVO) }
   try { Espera $espera } catch {
     if ([string]$_.Exception.Message -eq 'DETENER') {
       try { Remove-Item -LiteralPath $archivoDetener -Force } catch { }

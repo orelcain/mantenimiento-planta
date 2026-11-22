@@ -17,6 +17,7 @@ import type { CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
 import { GraderVivo } from '@/pages/monitor/GraderVivo'
 import type { ParadaGrader } from '@/pages/monitor/graderVivoDatos'
 import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
+import { FichaEstadoLector } from '@/pages/admin/EstadoLectorEspejo'
 import { LecturaEnVivoFila } from '@/components/grader/LecturaEnVivo'
 import type { EstadoVivo } from '@/services/grader/espejo/lecturaVivo'
 
@@ -26,6 +27,15 @@ const MODOS_VIVO: Array<{ estado: EstadoVivo; version: string }> = [
   { estado: { modo: 'pedido', hastaMs: Date.now() + 15 * 60_000 }, version: 'e1.4' },
   { estado: { modo: 'vivo', hastaMs: Date.now() + 12 * 60_000 }, version: 'e1.4' },
   { estado: { modo: 'sin-soporte', hastaMs: Date.now() + 15 * 60_000 }, version: 'e1.3' },
+]
+
+/** e1.6: estados de la recarga de historia con el rango de Matrix puesto a mano en días viejos. */
+const RANGO_VIEJO = ['2026-11-17 00:00:00', '2026-11-19 00:00:00']
+const RECARGAS = [
+  { recarga: 'leyendo 12000/34145 11980', error: '', parcial: true },
+  { recarga: 'con-limite', error: 'recarga-con-limite', parcial: true },
+  { recarga: 'terminada 34145 2026-11-17 00:00:01 a 2026-11-18 23:59:58', error: '', parcial: false },
+  { recarga: 'cancelada 4000', error: '', parcial: false },
 ]
 
 const T0 = Date.parse(real.t0)
@@ -136,6 +146,16 @@ export default function GraderVivoDevPage() {
               minutos={1}
               resumen={{ piezas: [], total: 4812, gate0: 0, p0: null, primera: '07:20:05', ultima: '10:49:00', turno: null, coincidencia: null }}
               accion={<LecturaEnVivoFila estado={m.estado} pedidoNombre="Orel" version={m.version} ocupado={false} error={null} onPedir={() => {}} onTerminar={() => {}} />}
+            />
+          ))}
+        </div>
+        {/* e1.6: la ficha de Diagnóstico Matrix durante y después de una recarga de historia (sin Firestore). */}
+        <div className="grid gap-3 lg:grid-cols-2" data-testid="dev-recarga">
+          {RECARGAS.map((r) => (
+            <FichaEstadoLector
+              key={r.recarga}
+              ahora={Date.now()}
+              e={{ equipo: 'CH-MANT-P07', linea: 'chonchi', ultimoLatidoMs: Date.now() - 60_000, leidoEn: '2026-11-21T14:05:00-03:00', informe: 'pieza', estado: { version: 'e1.6', ajuste: 'fechas-fijas', error: r.error, parcial: r.parcial, filasTabla: 34145, piezas: 9120, primera: '2026-11-21 07:20:05', ultima: '2026-11-21 14:01:10', rango: RANGO_VIEJO, limite: r.error !== '', recarga: r.recarga } }}
             />
           ))}
         </div>

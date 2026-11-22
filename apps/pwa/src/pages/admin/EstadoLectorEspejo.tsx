@@ -18,6 +18,7 @@ import {
   estaVivo,
   fraseActualizacion,
   fraseDeError,
+  fraseRecarga,
   textoArranque,
   type EstadoLector,
 } from '@/services/grader/espejo/espejoEstado'
@@ -41,8 +42,13 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
   const vivo = estaVivo(e.ultimoLatidoMs, ahora)
   const error = est.error && est.error !== 'iniciando' ? fraseDeError(est.error) : null
   const limite = avisoLimite(est)
-  const avance = avisoAvance(est)
-  const ajuste = estadoAjuste(est)
+  const recarga = fraseRecarga(est.recarga, est.rango, new Date(ahora))
+  // Durante una recarga el latido va «parcial» y el rango viejo es a propósito: ni «poniéndose al día» ni «mueve el
+  // fin del rango». Al terminar, el aviso de la recarga ya pide volver el rango a hoy: no se repite.
+  const enRecarga = est.recarga === 'con-limite' || Boolean(est.recarga?.startsWith('leyendo'))
+  const avance = enRecarga ? null : avisoAvance(est)
+  const ajusteBase = estadoAjuste(est)
+  const ajuste = ajusteBase && (enRecarga || recarga?.aviso) ? { ...ajusteBase, aviso: null } : ajusteBase
   const arranque = textoArranque(est.arranque)
   const actualiz = fraseActualizacion(est.actualiz)
   const rango = Array.isArray(est.rango) && est.rango.length > 0 ? est.rango.slice(0, 2).join(' → ') : '—'
@@ -73,6 +79,7 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
         <Dato k="Rango de Matrix" v={rango} />
         <Dato k="Límite de 10 000" v={est.limite === true ? 'marcado' : est.limite === false ? 'no marcado' : '—'} />
         {ajuste && <Dato k="Rango automático" v={ajuste.texto} />}
+        {recarga && <Dato k="Recarga de historia" v={recarga.texto} />}
         {typeof est.bloqueada === 'boolean' && (
           <Dato
             k="Sesión de Windows"
@@ -84,7 +91,7 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
         )}
         <Dato k="Error" v={est.error || 'ninguno'} />
       </dl>
-      {[error, limite, ajuste?.aviso ?? null].filter(Boolean).map((t) => (
+      {[error, limite, ajuste?.aviso ?? null, recarga?.aviso ?? null].filter(Boolean).map((t) => (
         <p key={t!} className="text-xs text-ink-warn">{t}</p>
       ))}
       {avance && <p className="text-xs text-muted-foreground tabular-nums">{avance}</p>}

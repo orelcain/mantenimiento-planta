@@ -47,9 +47,10 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
 
   it('e1.5: un fallo de las fechas no apaga la casilla; Matrix (Qt) que ignora SetValue queda como «fechas-fijas»', () => {
     // La casilla se revisa en cada «Actualizar»: la condición ya no depende de que las fechas funcionen.
-    expect(S).toContain('if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }')
+    expect(S).toContain('if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }')
     expect(S).not.toContain('ajusteApagado')
-    expect(S).toContain("if (-not $script:fechasApagadas) { $movio = Mueve-Fechas $ctl $q }")
+    // e1.6: en recarga de historia (solo casilla) tampoco se escriben las fechas.
+    expect(S).toContain("if (-not $script:fechasApagadas -and -not $soloCasilla) { $movio = Mueve-Fechas $ctl $q }")
     expect(S).toContain("$script:motivoFechas = 'fechas-fijas'")
     expect(S).toContain("if ($script:casillaFalla) { return 'casilla-no-aplico' }")
   })
@@ -67,12 +68,12 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
   })
 
   it('e1.2: con la sesión bloqueada no mueve el rango y lo informa en el latido', () => {
-    expect(S).toContain('-and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }')
+    expect(S).toContain('-and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }')
     expect(S).toContain("if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }")
   })
 
-  it('es la versión e1.5 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.5'"])
+  it('es la versión e1.6 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.6'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
@@ -83,7 +84,7 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(claves.length).toBeGreaterThan(15)
     expect(claves.length).toBeLessThanOrEqual(20)
     // e1.4: la lectura en vivo a pedido se informa en la clave «vivo».
-    expect(linea).toContain('vivo = (Texto-Vivo) }')
+    expect(linea).toContain('vivo = (Texto-Vivo); recarga = (Texto-Recarga ')
   })
 
   it('solo lee una tabla con las columnas exactas de «Pieza pieza Grader»', () => {
