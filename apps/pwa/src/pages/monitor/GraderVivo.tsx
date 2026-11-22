@@ -14,9 +14,10 @@ import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/g
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/graderVivo'
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
-import { Icono } from './AmpliarV2'
+import { Tarjeta } from './TarjetaVivo'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
+import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
 
 type Datos = DatosGraderVivo
 
@@ -39,24 +40,6 @@ function useAncho<T extends HTMLElement>(): [React.RefObject<T>, number] {
     return () => ro.disconnect()
   }, [])
   return [ref, w]
-}
-
-/** La tarjeta de vidrio del monitor v2 (`v2-tarjeta`, como `Tarjeta` de AmpliarV2): ícono en su círculo, título 15/500, sub 13. */
-function Tarjeta({ titulo, sub, icono, children, className }: { titulo?: string; sub?: string; icono?: React.ReactNode; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={cn('v2-tarjeta min-w-0 rounded-card p-4 lg:p-5', className)}>
-      {titulo && (
-        <div className="flex min-w-0 items-center gap-2">
-          {icono && <Icono>{icono}</Icono>}
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-medium leading-tight text-foreground">{titulo}</h3>
-            {sub && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{sub}</p>}
-          </div>
-        </div>
-      )}
-      {children}
-    </section>
-  )
 }
 
 const IC = "h-3.5 w-3.5"
@@ -625,6 +608,12 @@ export function GraderVivo(props: EntradaGraderVivo) {
         <Cifras d={d} />
       </div>
       <Curva d={d} />
+      {d.pesca?.seteo && (
+        <>
+          <SeteoGates s={d.pesca.seteo} />
+          <PescaPorPrograma s={d.pesca.seteo} />
+        </>
+      )}
       {d.pesca && (
         <>
           <div className="grid gap-3 lg:grid-cols-2">

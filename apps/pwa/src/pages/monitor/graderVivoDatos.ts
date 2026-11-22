@@ -31,9 +31,12 @@ import {
   type FilaTurno,
 } from '@/services/grader/espejo/pescaVivo'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
 
 /** El aviso de cambio de lote se muestra la primera hora del lote nuevo. */
 export const LOTE_AVISO_MIN = 60
+/** El aviso de cambio de programa de una gate, la primera hora desde el cambio. */
+export const GATE_CAMBIO_AVISO_MIN = 60
 
 const kg2 = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.', ',')) // decimal-tecnico: ya pasa a coma
 
@@ -41,7 +44,7 @@ const kg2 = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.'
  * Agregados que necesitan las piezas una a una (etapas 2, 5 y 1): causas P0, lote, distribución de peso, zona
  * compartida y los turnos anteriores. `null` sin piezas del turno.
  */
-export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, resumenes: readonly GraderDailySummary[] | null, turnoActualId: string | null) {
+export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, resumenes: readonly GraderDailySummary[] | null, turnoActualId: string | null, leidoHastaMs: number | null = null) {
   const ini = new Date(inicioMs).toISOString()
   const fin = new Date(finMs).toISOString()
   const pz = piezas.filter((p) => p.ts >= ini && p.ts < fin)
@@ -71,6 +74,20 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
       detalle: `En la última hora, 100 g bajo el límite: ${e.bajo.piezas} piezas; 100 g sobre él: ${e.alto.piezas}. Una pesca pareja no salta así: revisar la balanza o el seteo.`,
     })
   }
+  // Seteo de las gates hasta lo leído (nunca más allá del fin del turno): una gate gris es «sin piezas leídas».
+  const seteo = seteoGatesVivo(pz, leidoHastaMs != null && Number.isFinite(leidoHastaMs) ? Math.min(leidoHastaMs, finMs) : undefined)
+  for (const c of seteo?.cambios ?? []) {
+    if (Date.parse(seteo!.referenciaTs) - Date.parse(c.desdeTs) > GATE_CAMBIO_AVISO_MIN * 60_000) continue
+    avisos.push({
+      regla: 'gate-cambio',
+      nivel: 'atento',
+      desdeMin: desdeMin(c.desdeTs),
+      titulo: `${c.desdeTs.slice(11, 16)} · G${c.gate} cambió a ${c.despues}${c.estado === 'provisional' ? ' (sin confirmar)' : ''}`,
+      detalle: c.estado === 'provisional'
+        ? `Venía con ${c.antes}. Lleva ${c.piezas} piezas seguidas del programa nuevo; se confirma con 100.`
+        : `Venía con ${c.antes}. Confirmado con 100 piezas; nadie lo registró en la app.`,
+    })
+  }
   const filas: FilaTurno[] = [
     filaDelTurno(pz, `Hoy hasta ${pz[pz.length - 1]!.ts.slice(11, 16)}`),
     ...(resumenes && turnoActualId ? ultimosTurnos(resumenes, turnoActualId) : []),
@@ -84,6 +101,7 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
     zonaHora: zonaCompartida(hora),
     zonaTurno: zonaCompartida(pz),
     bordes: bordesPorGate(hora),
+    seteo,
     filas,
     avisos,
   }
@@ -140,7 +158,7 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     turnoEnCurso: e.turnoEnCurso,
     umbrales: { p0CriticoPct: DEFAULT_P0_CRITICAL_PCT, p0MinPiezas: P0_LINE_MIN_PIECES },
   })
-  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null) : null
+  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null, e.leidoHastaMs ?? null) : null
   return {
     n,
     serie,
