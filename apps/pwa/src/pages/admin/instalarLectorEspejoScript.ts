@@ -1018,7 +1018,11 @@ function Lee-Aperturas([datetime]$ahora) {
     $j = Get-Content -LiteralPath $archivoAbrir -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($s in @($j.veces)) {
       $t = [datetime]::MinValue
-      if ([datetime]::TryParseExact([string]$s, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) {
+      # PowerShell 7 convierte solo las fechas ISO al leer el JSON; PowerShell 5.1 (planta) las deja como texto.
+      $ok = $false
+      if ($s -is [datetime]) { $t = $s; $ok = $true }
+      else { $ok = [datetime]::TryParseExact([string]$s, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t) }
+      if ($ok) {
         if (($ahora - $t).TotalHours -lt 24 -and $t -le $ahora.AddMinutes(1)) { $l.Add($t) }
       }
     }
