@@ -98,6 +98,10 @@ describe('GraderVivo', () => {
     expect(screen.getByText('720.260.739')).toBeTruthy()
     expect(screen.getByText(/va \d+ min atrasada: es lo que tarda una pieza .* medido en este turno \(las curvas coinciden (bien|a medias)\)/)).toBeTruthy()
     expect(screen.queryByText(/\(r 0,/)).toBeNull()
+    // Eje de P0 cada 15 min con «%»; el de piezas por minuto, sin él.
+    const ejeP0 = [...document.querySelectorAll('svg[aria-label="P0 por tramo de 15 minutos"] text')].map((t) => t.textContent ?? '')
+    expect(ejeP0.slice(0, 3).every((t) => / %$/.test(t))).toBe(true)
+    expect([...document.querySelectorAll('svg text')].filter((t) => !t.closest('svg[aria-label="P0 por tramo de 15 minutos"]')).some((t) => / %$/.test(t.textContent ?? ''))).toBe(false)
   })
 
   it('la línea manual muestra horas completas y la de las 08:00 sale', () => {

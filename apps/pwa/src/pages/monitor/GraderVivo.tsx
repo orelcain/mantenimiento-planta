@@ -203,7 +203,7 @@ function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
       {rayas.map((v) => (
         <g key={v}>
           <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-          <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v} %</text>
+          <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
         </g>
       ))}
       {/* Detenciones como las bandas del Ritmo en vivo: velo del tono con su borde arriba; la programada, solo contorno punteado. */}
@@ -263,7 +263,7 @@ function P0Barras({ d }: { d: Datos }) {
             {[0, Math.round(tope / 2), tope].map((v) => (
               <g key={v}>
                 <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
+                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v} %</text>
               </g>
             ))}
             {ts.map((t, i) => {
