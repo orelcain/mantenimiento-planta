@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-22' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader en vivo: seteo real de las 12 gates y pesca por programa' as const
+export const VERSION_NAME = 'Lector del grader e1.7: lee siempre y rellena solo los huecos del espejo' as const
 
 /**
  * Nota:
