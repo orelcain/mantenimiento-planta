@@ -362,8 +362,8 @@ export interface TurnoMonitorEntrada {
 
 export interface PublicShiftMonitorDoc {
   token: string
-  /** Los otros monitores de línea vigentes de la misma planta (para el selector del Duelo, sin sesión). */
-  lineasHermanas?: Array<{ nombre: string; token: string }>
+  /** Los otros monitores de línea vigentes (de cualquier planta con monitor; para el selector, sin sesión). `plantLineId` manda el rótulo. */
+  lineasHermanas?: Array<{ nombre: string; token: string; plantLineId?: string }>
   mode?: MonitorMode
   plantSlug: string
   dateKey: string

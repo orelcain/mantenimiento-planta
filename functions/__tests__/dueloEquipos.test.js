@@ -182,10 +182,38 @@ test('lineasHermanasDe: los otros monitores de línea vigentes de la misma plant
     docMon('tok-fil', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(20) }),
     docMon('tok-vencido', { mode: 'line', plantLineId: 'chonchi-otra', areaLabel: 'Otra', expiresAt: vence(-1) }),
     docMon('tok-fijo', { mode: 'token', plantLineId: 'chonchi-embalaje', areaLabel: 'Embalaje', expiresAt: vence(5) }),
+    docMon('tok-yal', { mode: 'line', plantLineId: 'yal-eviscerado', areaLabel: 'Eviscerado', expiresAt: vence(7) }),
   ])
   const r = await lineasHermanasDe(db, { token: 'tok-evi', plantLineId: 'chonchi-eviscerado' }, AHORA)
-  assert.deepEqual(r, [{ nombre: 'Filete', token: 'tok-fil' }], 'sin sí misma, sin vencidos, sin links de turno fijo y con el link que vence más tarde')
-  assert.deepEqual(db.consultas[0], [['plantLineId', '>=', 'chonchi-'], ['plantLineId', '<', 'chonchi.']], 'una sola consulta por rango, solo de esa planta')
+  assert.deepEqual(r, [
+    { nombre: 'Filete', token: 'tok-fil', plantLineId: 'chonchi-filete' },
+    { nombre: 'Eviscerado', token: 'tok-yal', plantLineId: 'yal-eviscerado' },
+  ], 'sin sí misma, sin vencidos, sin links de turno fijo, con Yal (otra planta) y con el link que vence más tarde')
+  assert.deepEqual(db.consultas[0], [['plantLineId', 'in', ['chonchi-eviscerado', 'chonchi-filete', 'yal-eviscerado']]], 'una sola consulta por las líneas con monitor')
+})
+
+test('lineasHermanasDe: Yal ve a las líneas de Principal, y la lista del servidor es la misma que la PWA', async () => {
+  const { lineasHermanasDe, LINEAS_MONITOR_HERMANAS } = require('../publicMonitor')
+  const db = dbConMonitores([
+    docMon('tok-evi', { mode: 'line', plantLineId: 'chonchi-eviscerado', areaLabel: 'Eviscerado', expiresAt: vence(10) }),
+    docMon('tok-yal', { mode: 'line', plantLineId: 'yal-eviscerado', areaLabel: 'Eviscerado', expiresAt: vence(7) }),
+  ])
+  const r = await lineasHermanasDe(db, { token: 'tok-yal', plantLineId: 'yal-eviscerado' }, AHORA)
+  assert.deepEqual(r, [{ nombre: 'Eviscerado', token: 'tok-evi', plantLineId: 'chonchi-eviscerado' }])
+  // Paridad: el listado del servidor debe coincidir con LINEAS_CON_MONITOR de la PWA (si no, el selector no cuadra).
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const fuente = fs.readFileSync(path.join(__dirname, '..', '..', 'apps', 'pwa', 'src', 'services', 'shoplogix', 'monitorDeLinea.ts'), 'utf8')
+  const pwa = [...fuente.match(/LINEAS_CON_MONITOR[^=]*=\s*\[([^\]]*)\]/)[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+  assert.deepEqual([...LINEAS_MONITOR_HERMANAS].sort(), [...pwa].sort())
+})
+
+test('patchHermanas: una lista guardada sin plantLineId (antes de Yal) se vuelve a buscar aunque no haya vencido', async () => {
+  const { patchHermanas } = require('../publicMonitor')
+  const db = dbConMonitores([docMon('b', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(5) })])
+  const vieja = { token: 'a', plantLineId: 'chonchi-eviscerado', lineasHermanas: [{ nombre: 'Filete', token: 'b' }], lineasHermanasAt: new Date(AHORA).toISOString() }
+  const r = await patchHermanas(db, vieja, AHORA + 60_000)
+  assert.deepEqual(r.lineasHermanas, [{ nombre: 'Filete', token: 'b', plantLineId: 'chonchi-filete' }])
 })
 
 test('lineasHermanasDe: sin hermanas vigentes devuelve [] y un monitor sin plantLineId no consulta nada', async () => {
@@ -202,7 +230,7 @@ test('patchHermanas: se vuelve a buscar solo si pasó una hora; un error no romp
   const db = dbConMonitores([docMon('b', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(5) })])
   const monitor = { token: 'a', plantLineId: 'chonchi-eviscerado' }
   const nuevo = await patchHermanas(db, monitor, AHORA)
-  assert.deepEqual(nuevo.lineasHermanas, [{ nombre: 'Filete', token: 'b' }])
+  assert.deepEqual(nuevo.lineasHermanas, [{ nombre: 'Filete', token: 'b', plantLineId: 'chonchi-filete' }])
   assert.equal(nuevo.lineasHermanasAt, new Date(AHORA).toISOString())
   // Al día: no consulta (no cuesta lecturas en cada refresco).
   const antes = db.consultas.length

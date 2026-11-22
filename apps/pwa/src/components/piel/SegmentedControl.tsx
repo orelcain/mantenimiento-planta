@@ -21,6 +21,23 @@ export interface Segment<T extends string> {
   value: T
   label: ReactNode
   icon?: ReactNode
+  /**
+   * Agrupa el segmento en una pista propia dentro del mismo `tablist` (p. ej. «Planta Principal» | «Referencia»).
+   * Si ningún segmento trae grupo, el control se dibuja igual que siempre.
+   */
+  grupo?: GrupoSegmento
+}
+
+export interface GrupoSegmento {
+  clave: string
+  /** Rótulo sobre la pista en celular, o a la izquierda en PC si no hay `tituloCorto`. */
+  titulo: ReactNode
+  /** Rótulo corto para PC (en línea con la pista). */
+  tituloCorto?: ReactNode
+  /** Pista ajustada al contenido (no ocupa la fila). */
+  ajustado?: boolean
+  /** Segmentos sin elegir con tinta atenuada (`text-muted-foreground`). */
+  atenuado?: boolean
 }
 
 export interface SegmentedControlProps<T extends string> {
@@ -42,9 +59,14 @@ export interface SegmentedControlProps<T extends string> {
    * Sin esto, `flex-1` reparte un ancho de contenido y el texto se corta.
    */
   ajustado?: boolean
+  /**
+   * Con grupos: `apilada` (celular) pone el rótulo encima de cada pista; `en-linea` (PC) lo pone a la izquierda,
+   * con pistas de 32 px (44 con puntero táctil).
+   */
+  disposicionGrupos?: 'apilada' | 'en-linea'
 }
 
-export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className, tamano = 'normal', ajustado = false }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className, tamano = 'normal', ajustado = false, disposicionGrupos = 'apilada' }: SegmentedControlProps<T>) {
   const grande = tamano === 'herramienta'
   const botones = useRef<(HTMLButtonElement | null)[]>([])
   // Tabulable: el elegido; si ningún valor coincide, el primero.
@@ -65,6 +87,73 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
     if (!seg) return
     onChange(seg.value)
     botones.current[destino]?.focus()
+  }
+
+  if (segments.some(s => s.grupo)) {
+    // Un solo tablist con una pista por grupo: las flechas recorren todos los segmentos (`alTeclear`).
+    const enLinea = disposicionGrupos === 'en-linea'
+    const grupos: Array<{ clave: string; titulo: ReactNode; tituloCorto: ReactNode; ajustado: boolean; atenuado: boolean; items: Array<{ s: Segment<T>; i: number }> }> = []
+    segments.forEach((s, i) => {
+      const clave = s.grupo?.clave ?? ''
+      let g = grupos.find(x => x.clave === clave)
+      if (!g) {
+        g = {
+          clave,
+          titulo: s.grupo?.titulo ?? null,
+          tituloCorto: s.grupo?.tituloCorto ?? s.grupo?.titulo ?? null,
+          ajustado: !!s.grupo?.ajustado,
+          atenuado: !!s.grupo?.atenuado,
+          items: [],
+        }
+        grupos.push(g)
+      }
+      g.items.push({ s, i })
+    })
+    return (
+      <div role="tablist" aria-label={ariaLabel} className={cn('flex gap-2', enLinea ? 'items-center' : 'items-start', className)}>
+        {grupos.map(g => (
+          <div key={g.clave || 'sin-grupo'} className={cn('flex min-w-0', enLinea ? 'shrink-0 items-center gap-2' : 'flex-col', !enLinea && (g.ajustado ? 'shrink-0' : 'flex-1'))}>
+            {g.titulo != null && (
+              <span className={cn('font-medium text-muted-foreground', enLinea ? 'whitespace-nowrap text-footnote' : 'pb-1 pl-3 text-caption1')}>
+                {enLinea ? g.tituloCorto : g.titulo}
+              </span>
+            )}
+            <div className={cn('flex box-border rounded-full bg-muted p-0.5', enLinea ? 'h-8 [@media(pointer:coarse)]:h-11' : 'h-11', !enLinea && !g.ajustado && 'w-full')}>
+              {g.items.map(({ s, i }) => {
+                const on = s.value === value
+                const flexible = !enLinea && !g.ajustado
+                return (
+                  <button
+                    key={s.value}
+                    ref={el => { botones.current[i] = el }}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    tabIndex={i === tabulable ? 0 : -1}
+                    onClick={() => onChange(s.value)}
+                    onKeyDown={e => alTeclear(e, i)}
+                    className={cn(flexible ? 'flex min-w-0 flex-1' : 'flex flex-none', 'h-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40')}
+                  >
+                    <span
+                      className={cn(
+                        flexible ? 'flex min-w-0 flex-1 px-2' : 'flex flex-none px-3 whitespace-nowrap',
+                        'items-center justify-center gap-1.5 rounded-full text-subhead transition-[background-color,box-shadow] duration-150',
+                        on
+                          ? 'bg-card font-semibold text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.4)]'
+                          : cn('font-medium hover:text-foreground', g.atenuado ? 'text-muted-foreground' : 'text-foreground/80'),
+                      )}
+                    >
+                      {s.icon && <span className="shrink-0 [&>svg]:size-4">{s.icon}</span>}
+                      <span className={flexible ? 'truncate' : 'whitespace-nowrap'}>{s.label}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (

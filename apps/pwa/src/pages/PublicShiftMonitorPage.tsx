@@ -114,6 +114,9 @@ import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
 import { causaLegible, etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
+import { segmentosDeLineas } from './monitor/segmentosLinea'
+import { lineaDeMonitor, nombrePlanta, subtituloMaquina } from './monitor/nombrePlanta'
+import { getMachineKind } from '@/config/plantLines'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
 import { useDueloConfig } from './monitor/dueloConfig'
 import type { PestanaMonitor } from './monitor/BarraLateralPC'
@@ -4547,7 +4550,7 @@ function CambioDeLinea({ plantLineId, plantSlug, className }: {
         className={cambiando ? 'min-w-0 flex-1 opacity-60' : 'min-w-0 flex-1'}
         ariaLabel="Línea del monitor"
         value={actual.id}
-        segments={LINEAS_CON_MONITOR.map((id) => ({ value: id, label: lineaConMonitor(id)?.areaLabel ?? id }))}
+        segments={segmentosDeLineas(LINEAS_CON_MONITOR, (id) => lineaConMonitor(id)?.areaLabel ?? id)}
         onChange={(id) => { void cambiar(id) }}
       />
     </nav>
@@ -6110,17 +6113,22 @@ function MonitorDelToken() {
         <Hourglass className="h-11 w-11 text-primary" />
         <p className="text-lg font-semibold text-foreground">Esperando el próximo turno</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          {data.machineKindLong || data.lineLabel || 'La línea'} no tiene un turno en curso. Esta
+          {nombrePlanta(data.plantLineId, data.plantSlug) ?? (data.machineKindLong || data.lineLabel || 'La línea')} no tiene un turno en curso. Esta
           pantalla se llena sola cuando arranque — deja el link guardado.
         </p>
       </div>
     )
   }
 
-  const lineTitle = data.machineKindLong || data.lineLabel || data.areaLabel || 'Línea de producción'
-  // Dedupe: en las líneas donde el área y la planta se llaman igual (Filete)
-  // el subtítulo quedaba "Filete · Filete".
-  const areaTitle = [...new Set([data.lineLabel, data.areaLabel].filter(Boolean))].join(' · ')
+  // Nombres calculados desde `plantLineId` (o `plantSlug`), nunca desde los rótulos guardados en el doc.
+  const lineaDeEsta = lineaDeMonitor(data.plantLineId, data.plantSlug)
+  const lineTitle = nombrePlanta(data.plantLineId, data.plantSlug) ?? (data.machineKindLong || data.lineLabel || data.areaLabel || 'Línea de producción')
+  // El subtítulo es la máquina (sin «de <área>»); desde tablet lo muestra CabeceraV2. Sin línea en la config, la vieja.
+  const areaTitle = lineaDeEsta
+    ? subtituloMaquina(lineaDeEsta, getMachineKind(lineaDeEsta.id).long)
+    : ([...new Set([data.lineLabel, data.areaLabel].filter(Boolean))].join(' · ') || null)
+  // Yal se mira como referencia: la pastilla «Referencia» acompaña el estado (PC y TV).
+  const referencia = lineaDeEsta != null && lineaDeEsta.plant !== 'principal'
 
   /* El número grande: el contador crudo de Shoplogix, el mismo que muestra la
      pantalla de planta, con caída al derivado de los buckets cuando el vivo no
@@ -6133,7 +6141,7 @@ function MonitorDelToken() {
   /* Las otras líneas con monitor vigente (sin sesión): alimenta el selector de El turno, Análisis y Duelo. */
   const lineasMonitor: LineasMonitor | null = data.lineasHermanas && data.lineasHermanas.length > 0
     ? {
-        actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',
+        actual: lineaDeEsta?.id ?? data.plantLineId ?? 'Esta línea',
         hermanas: data.lineasHermanas,
         onIr: (tk) => navigate(rutaMonitorConservandoVista(tk, searchParams)),
       }
@@ -6634,6 +6642,7 @@ function MonitorDelToken() {
       >
       <TvV2
         linea={lineTitle}
+        referencia={referencia}
         turno={[vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId), rangoBarra].filter(Boolean).join(' · ')}
         estado={estadoTv({
           cerrado: turnoCerrado,
@@ -6717,9 +6726,13 @@ function MonitorDelToken() {
         <CabeceraV2
           titulo={lineTitle}
           area={areaTitle ?? null}
-          estado={turnoCerrado
-            ? <Pill tone="neutral" dot>Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}</Pill>
-            : <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
+          estado={<>
+            {turnoCerrado
+              ? <Pill tone="neutral" dot>Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}</Pill>
+              : <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
+            {/* PC: la pastilla de referencia va después del estado; en celular la marca el selector (grupo «Referencia»). */}
+            {referencia && <Pill tone="neutral" className="hidden lg:inline-flex">Referencia</Pill>}
+          </>}
           tema={(
             <span className="flex items-center gap-1.5">
               <button
@@ -6758,7 +6771,7 @@ function MonitorDelToken() {
             rangoBarra,
           ].filter(Boolean).join(' · ')}
           /* El selector de línea vive en la barra de PC (El turno y Análisis); el Duelo trae el suyo en su lienzo. */
-          selectorPc={pestana !== 'duelo' && lineasMonitor ? <SelectorLinea lineas={lineasMonitor} className="v2-selector-barra" /> : null}
+          selectorPc={pestana !== 'duelo' && lineasMonitor ? <SelectorLinea lineas={lineasMonitor} className="v2-selector-barra" disposicion="en-linea" /> : null}
           /* De dónde salen todas las cifras, UNA vez: la hora de la última lectura del contador de Shoplogix (solo en vivo). */
           marca={corteHoraV2 ? `Shoplogix ${corteHoraV2}` : null}
           navMovil={(vistas.length > 1 || listaTurnos.length > 1) && !modoPantalla
