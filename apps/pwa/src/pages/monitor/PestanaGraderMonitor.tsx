@@ -248,6 +248,7 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           resumenes={previos.estado === 'listo' ? previos.valor : null}
           turnoActualId={turnoActualId}
           gate0Exacto={gate0Exacto}
+          publico={!esAdmin}
         />
       )}
       <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">

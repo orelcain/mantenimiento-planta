@@ -631,8 +631,8 @@ function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
 }
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
-export function GraderVivo(props: EntradaGraderVivo) {
-  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
+export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
+  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
   const d = useMemo(
     () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto }),
     [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
@@ -652,7 +652,7 @@ export function GraderVivo(props: EntradaGraderVivo) {
       {d.pesca?.seteo && (
         <>
           <SeteoGates s={d.pesca.seteo} />
-          <PescaPorPrograma s={d.pesca.seteo} />
+          <PescaPorPrograma s={d.pesca.seteo} publico={publico} />
         </>
       )}
       {d.pesca && (
