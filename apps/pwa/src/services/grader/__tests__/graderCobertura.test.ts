@@ -164,3 +164,24 @@ describe('ddmmHhmm', () => {
     expect(ddmmHhmm(null)).toBe('')
   })
 })
+
+describe('calcularCobertura con el espejo (22-11)', () => {
+  it('sin Excel pero con el espejo del turno entero: no es «0 %» ni falta nada', () => {
+    // 21-11 T2: el monitor cierra el turno en el fin efectivo (14:50) y el espejo trae de 07:21 a 14:50.
+    const c = calcularCobertura({ ...base, fin: t('14:50'), ahoraWallMs: Number.POSITIVE_INFINITY, resumenes: [], espejo: [{ desde: ms('07:21'), hasta: ms('14:50') }] })!
+    expect(c.pct).toBe(99)
+    expect(c.faltaCola).toBeNull()
+    expect(c.hasta).toBe(ms('14:50'))
+  })
+
+  it('un hueco del espejo queda como faltante y suma con el Excel', () => {
+    const c = calcularCobertura({
+      ...base,
+      ahoraWallMs: ms('15:00'),
+      resumenes: [{ startAt: t('07:15'), endAt: t('09:00') }],
+      espejo: [{ desde: ms('08:30'), hasta: ms('12:00') }, { desde: ms('12:40'), hasta: ms('15:00') }],
+    })!
+    expect(c.faltantes).toEqual([{ desde: ms('12:00'), hasta: ms('12:40') }])
+    expect(c.faltaCola).toBeNull()
+  })
+})

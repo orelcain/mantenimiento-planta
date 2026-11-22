@@ -22,8 +22,6 @@ export const CAMBIO_RESTO_MAX = 0.1
 export const ETIQUETA_MIN_FRAC = 0.1
 /** Gate sin piezas hace este rato o más: gris, «programa sin confirmar». */
 export const GATE_APAGADA_MIN = 30
-/** Escala fija de la barra de ritmo (no habla de saturación: la capacidad de una gate no se conoce). */
-export const RITMO_TOPE_PZ_MIN = 10
 /** Programa de poco flujo: menos que esto por gate en el turno. Se agrupa en la pesca. */
 export const POCO_FLUJO_PZ_MIN = 1
 /** Eje común del peso. */
@@ -97,6 +95,15 @@ export function tramosDeGate(gate: number, ps: readonly PiezaEspejo[]): { tramos
       if (conocidas.has(et) && racha.n >= CAMBIO_SEGUIDAS) {
         conocidas.add(cand.et)
         cand = null
+        continue
+      }
+      // Otra etiqueta nueva con su racha: el candidato era un paso suelto y lo reemplaza la nueva. Sin esto la gate
+      // quedaba con dos rótulos (21-11 T2, G10: «12-UP Premium» con 2 piezas desde las 12:13 y recibiendo «8-10
+      // CALIDAD D» el resto del turno).
+      if (et !== cand.et && !conocidas.has(et) && racha.n >= CAMBIO_SEGUIDAS) {
+        let n = 0
+        for (let j = racha.desde; j <= i; j++) n += ps[j]!.cantidad
+        cand = { et, desdeIdx: racha.desde, seguidas: racha.n, n, nTotal: n, vistoResto: 0 }
         continue
       }
       if (cand.n >= CAMBIO_MIN_PIEZAS && cand.vistoResto <= CAMBIO_RESTO_MAX * cand.nTotal) {

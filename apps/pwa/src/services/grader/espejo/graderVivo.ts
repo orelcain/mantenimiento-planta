@@ -85,7 +85,7 @@ export interface Retraso {
  * dato de los dos lados; pide ≥ 120 minutos y r ≥ 0,5. Si no alcanza, devuelve `null` (la pantalla usa la
  * referencia y lo dice).
  */
-export function medirRetraso(baader: number[] | null, grader: number[], hastaMin: number): Retraso | null {
+export function medirRetraso(baader: number[] | null, grader: number[], hastaMin: number, sinLectura: readonly boolean[] = []): Retraso | null {
   if (!baader) return null
   let mejor: Retraso | null = null
   for (let L = 0; L <= RETRASO_MAX_MIN; L++) {
@@ -95,7 +95,7 @@ export function medirRetraso(baader: number[] | null, grader: number[], hastaMin
       const k = m - L
       if (k >= baader.length) break
       const v = baader[k] ?? 0
-      if (!Number.isFinite(v)) continue // sin cobertura de Shoplogix
+      if (!Number.isFinite(v) || sinLectura[m]) continue // sin cobertura de Shoplogix o minuto que el espejo no leyó
       a.push(v)
       b.push(grader[m] ?? 0)
     }
@@ -106,8 +106,8 @@ export function medirRetraso(baader: number[] | null, grader: number[], hastaMin
   return mejor && (mejor.r ?? 0) >= RETRASO_MIN_R ? mejor : null
 }
 
-export function retrasoOReferencia(baader: number[] | null, grader: number[], hastaMin: number): Retraso {
-  return medirRetraso(baader, grader, hastaMin) ?? { min: RETRASO_REFERENCIA_MIN, r: null, medido: false }
+export function retrasoOReferencia(baader: number[] | null, grader: number[], hastaMin: number, sinLectura: readonly boolean[] = []): Retraso {
+  return medirRetraso(baader, grader, hastaMin, sinLectura) ?? { min: RETRASO_REFERENCIA_MIN, r: null, medido: false }
 }
 
 export interface TramoP0 {
@@ -144,19 +144,22 @@ export interface HoraManual {
   hora: string
   grader: number
   baader: number
-  /** Grader − Baader: positivo = piezas que entraron al grader sin pasar por las Baader. */
-  diferencia: number
+  /** Grader − Baader: positivo = piezas que entraron al grader sin pasar por las Baader. `null` = sin lectura. */
+  diferencia: number | null
+  /** El espejo no leyó parte de la hora (`minutosSinLectura`): la resta saldría negativa y falsa. */
+  sinLectura: boolean
 }
 
 /**
  * Línea manual por hora de reloj COMPLETA: piezas del grader de la hora menos las de las Baader de la misma hora
  * corrida por el retraso. La hora en curso no entra (saldría negativa), ni una hora sin la serie de las Baader
- * completa para ese tramo.
+ * completa para ese tramo. Una hora que toca un minuto sin lectura del espejo sale marcada, sin diferencia.
  */
 export function lineaManualPorHora(
   s: { t0Ms: number; pz: number[]; hastaMin: number },
   baader: number[] | null,
   retrasoMin: number,
+  sinLectura: readonly boolean[] = [],
 ): HoraManual[] {
   if (!baader) return []
   const L = Math.max(0, Math.round(retrasoMin))
@@ -169,14 +172,16 @@ export function lineaManualPorHora(
     let g = 0
     let b = 0
     let cubierta = true
+    let leida = true
     for (let m = a; m < a + 60; m++) {
+      if (sinLectura[m]) leida = false
       const v = baader[m - L] ?? 0
       if (!Number.isFinite(v)) { cubierta = false; break }
       g += s.pz[m] ?? 0
       b += v
     }
     if (!cubierta) continue // la serie de las Baader no cubre esa hora entera
-    out.push({ hora: horaDelEje(s.t0Ms, a), grader: g, baader: b, diferencia: g - b })
+    out.push({ hora: horaDelEje(s.t0Ms, a), grader: g, baader: b, diferencia: leida ? g - b : null, sinLectura: !leida })
   }
   return out
 }

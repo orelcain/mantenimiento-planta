@@ -286,8 +286,10 @@ describe('evaluarAlertas', () => {
     const g = grader(60, 0)
     for (let m = 45; m < 60; m++) g.pz[m] = 20
     for (let m = 45; m < 51; m++) g.g0[m] = 1 // 6/300 = 2 %
-    expect(evaluarAlertas(entrada({ grader: g }))).toEqual([])
-    expect(evaluarAlertas(entrada({ grader: g, umbrales: { p0CriticoPct: 1.5 } })).map((x) => x.regla)).toEqual(['p0-alto'])
+    // Las Baader al ritmo del grader: los 45 min sin piezas son un hueco del espejo y no debe salir atasco.
+    const baader = Array(60).fill(20)
+    expect(evaluarAlertas(entrada({ grader: g, baader }))).toEqual([])
+    expect(evaluarAlertas(entrada({ grader: g, baader, umbrales: { p0CriticoPct: 1.5 } })).map((x) => x.regla)).toEqual(['p0-alto'])
   })
 })
 
