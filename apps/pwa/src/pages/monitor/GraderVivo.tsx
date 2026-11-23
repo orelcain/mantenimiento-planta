@@ -19,7 +19,8 @@ import { HojaLote, LotesDelTurno } from './LotesDelTurno'
 import { LineaManual } from './LineaManual'
 import { indiceLote } from './lotesTurnoDatos'
 import type { Accion } from './hayQueHacerDatos'
-import { cuentaDelTurno } from './cuantoLlevamosDatos'
+import { cuentaDelTurno, extraDelTurno } from './cuantoLlevamosDatos'
+import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
 
@@ -46,6 +47,8 @@ const IC = "h-3.5 w-3.5"
 
 function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   const a = d.alertas
+  // Último tramo de 15 min cerrado con piezas suficientes: el mismo que mira la alerta «P0 alto».
+  const ultimoP0 = d.totales.p0 === null ? null : [...d.p0].reverse().find((t) => t.completo && !t.pocaMasa && t.pct !== null) ?? null
   return (
     <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'} icono={<BellRing className={IC} />}>
       <ul className="mt-3 space-y-2" aria-label="Alertas del grader">
@@ -63,6 +66,12 @@ function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
           </li>
         ))}
       </ul>
+      {a.length === 0 && (
+        <div className="mt-3 space-y-1.5 text-[13px] leading-[18px]" data-testid="alertas-vigila">
+          {ultimoP0 && <p className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">P0 en 15 min ({ultimoP0.rotulo})</span><b className="tabular-nums text-foreground">{coma1(ultimoP0.pct!)} % <small className="font-normal text-muted-foreground">de {coma1(DEFAULT_P0_CRITICAL_PCT)} %</small></b></p>}
+          <p className="text-muted-foreground">Sin cambio en la última hora: peso y calibre, gates, lote y fotocélula. Si algo se mueve, aparece aquí.</p>
+        </div>
+      )}
       <p className="mt-3 text-[13px] leading-[18px] text-muted-foreground tabular-nums">
         {ultimaHora ? `Última pieza leída ${ultimaHora}. ` : ''}Las alertas se miden hasta la última pieza leída, no hasta la hora del reloj.
       </p>
@@ -242,9 +251,9 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
   }
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid items-start gap-3 lg:grid-cols-3">
         <Alertas d={d} ultimaHora={ultimaHora} />
-        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
+        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} extra={extraDelTurno(d.serie.pz, d.serie.hastaMin, d.n, turnoEnCurso, d.totales.g0)} />
         {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} onAbrir={abrirAccion} />}
       </div>
       <GraficoVivo d={d} onAbrirLote={setLoteAbierto} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />

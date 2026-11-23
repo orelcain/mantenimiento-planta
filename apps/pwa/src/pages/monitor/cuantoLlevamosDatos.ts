@@ -64,3 +64,41 @@ export function tramosBarra(c: CuentaTurno): { baader: number; manual: number; s
   if (tot <= 0) return { baader: 0, manual: 0, sinLeer: 0 }
   return { baader: (b / tot) * 100, manual: (m / tot) * 100, sinLeer: (c.baaderSinLeer / tot) * 100 }
 }
+
+export interface ExtraTurno {
+  /** Piezas por hora de la última hora leída (proyectado a 60 min si lleva menos). */
+  ritmoHora: number
+  /** Piezas por hora promedio del turno hasta ahora. */
+  ritmoTurno: number
+  /** % de P0 del turno (`null` sin piezas o sin Gate 0). */
+  p0Pct: number | null
+  p0Pz: number
+  /** Piezas al cierre del turno al ritmo de la última hora; `null` si el turno ya cerró o no hay con qué proyectar. */
+  alCierre: number | null
+  /** Minutos que faltan para el fin del turno (0 si cerró). */
+  faltanMin: number
+}
+
+/** Ritmo y proyección al cierre con números planos (sirve igual para Eviscerado). `pz` por minuto del turno. */
+export function extraDelTurno(pz: readonly number[], hastaMin: number, totalMin: number, enCurso: boolean, g0Pz: number): ExtraTurno {
+  const ini = Math.max(0, hastaMin - 60)
+  let ult = 0
+  let todo = 0
+  for (let m = 0; m < hastaMin; m++) {
+    const v = pz[m] ?? 0
+    todo += v
+    if (m >= ini) ult += v
+  }
+  const minUlt = hastaMin - ini
+  const ritmoHora = minUlt > 0 ? (ult * 60) / minUlt : 0
+  const ritmoTurno = hastaMin > 0 ? (todo * 60) / hastaMin : 0
+  const faltanMin = enCurso ? Math.max(0, totalMin - hastaMin) : 0
+  return {
+    ritmoHora,
+    ritmoTurno,
+    p0Pct: todo > 0 && g0Pz > 0 ? (g0Pz / todo) * 100 : null,
+    p0Pz: g0Pz,
+    alCierre: enCurso && faltanMin > 0 && minUlt >= 15 ? todo + (ritmoHora * faltanMin) / 60 : null,
+    faltanMin,
+  }
+}
