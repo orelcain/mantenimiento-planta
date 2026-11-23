@@ -19,7 +19,7 @@ import { loadGate0Records, type StoredGate0Record } from '@/services/grader/grad
 import { buildDailySummaryId } from '@/services/grader/graderDailySummary.service'
 import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
 import { leidoHastaDelLector } from '@/services/grader/espejo/espejoEstado'
-import { baaderEnEje, RETRASO_REFERENCIA_MIN, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import { baaderEnEje, RETRASO_REFERENCIA_MIN, serieDesdeCada5, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
 import { minutosSinLectura } from '@/services/grader/espejo/alertasGrader'
 import { serieDesdeCubetas, type CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
 import { useIsAdmin } from '@/store/authStore'
@@ -35,7 +35,7 @@ import {
   type CadenciaExporte,
   type Tramo,
 } from '@/services/grader/graderCobertura'
-import { useDatosGraderHasta, useResumenesAlrededor, useResumenesPrevios } from '@/services/grader/graderDatosHasta'
+import { useDatosGraderHasta, useResumenesAlrededor } from '@/services/grader/graderDatosHasta'
 
 const CLAVE_CADENCIA = (lineId: string) => `grader-cadencia-exporte:${lineId}`
 
@@ -188,8 +188,16 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   baader?: SerieMinutoBaader | null
   /** Detenciones de Shoplogix del turno, ubicadas en el reloj. */
   paradas?: ParadaGrader[]
+  /** Respaldo sin serie por minuto: las cubetas de 5 min de la línea (`live.series`). */
+  baaderCada5?: ReadonlyArray<{ t: string; pieces: number }> | null
 }) {
-  const { lineId, dateKey, inicio, fin, turnoId, ahoraWallMs, baader = null, paradas = SIN_PARADAS } = props
+  const { lineId, dateKey, inicio, fin, turnoId, ahoraWallMs, paradas = SIN_PARADAS, baaderCada5 = null } = props
+  // Sin la serie por minuto, las Baader salen de las cubetas de 5 min cerradas (el subtítulo del gráfico lo dice).
+  const respaldo5 = useMemo(
+    () => (!props.baader && baaderCada5 ? serieDesdeCada5(baaderCada5, ahoraWallMs) : null),
+    [props.baader, baaderCada5, ahoraWallMs],
+  )
+  const baader = props.baader ?? respaldo5
   const esAdmin = useIsAdmin()
   // Solo la ventana del turno (con su margen) se baja y se reparte; sin ventana no se baja nada.
   const ventana = useMemo(
@@ -197,13 +205,10 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
     [dateKey, inicio, fin, turnoId],
   )
   const espejo = useEspejoGrader(lineaDelEspejo(lineId), ventana)
-  // Cierres de los días anteriores, para comparar el turno con los últimos 6 (una lectura por día visto).
-  const previos = useResumenesPrevios(lineId, dateKey)
   const turnoEnCurso = Number.isFinite(ahoraWallMs) && (!ventana || ahoraWallMs < ventana.endMs)
   // Última lectura COMPLETA del lector (sin tramo pendiente, error ni recarga), nunca más allá del fin del rango de
   // Matrix: hasta ahí los minutos sin piezas son de verdad.
   const leidoHastaMs = leidoHastaDelLector(espejo.estado)
-  const turnoActualId = dateKey && turnoId ? `${dateKey}__${turnoId}` : null
   const tramosEspejo = useMemo(
     () => (ventana && !espejo.cargandoPiezas ? tramosDelEspejo(espejo.cubetas, ventana.startMs, ventana.endMs, baader) : SIN_TRAMOS),
     [ventana, espejo.cargandoPiezas, espejo.cubetas, baader],
@@ -240,13 +245,12 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           inicioMs={ventana.startMs}
           finMs={ventana.endMs}
           baader={baader}
+          baaderCada5={respaldo5 !== null}
           paradas={paradas}
           minutosSinLatido={espejo.minutos}
           turnoEnCurso={turnoEnCurso}
           leidoHastaMs={leidoHastaMs}
           piezas={espejo.piezas}
-          resumenes={previos.estado === 'listo' ? previos.valor : null}
-          turnoActualId={turnoActualId}
           gate0Exacto={gate0Exacto}
           publico={!esAdmin}
         />

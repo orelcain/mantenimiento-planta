@@ -8,24 +8,22 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BellRing, Filter, Gauge, Hand, Layers, Package, ShieldAlert, SplitSquareHorizontal } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
+import { BellRing, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
-import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/graderVivo'
-import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { Tarjeta } from './TarjetaVivo'
-import { RELLENO_DUENO } from './ejeTurno'
-import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
+import { CuantoLlevamos } from './CuantoLlevamos'
+import { HayQueHacerAlgo } from './HayQueHacerAlgo'
+import { GraficoVivo } from './GraficoVivo'
+import { HojasP0, PorQueP0, type HojaP0 } from './PorQueP0'
+import { HojaLote, LotesDelTurno } from './LotesDelTurno'
+import { LineaManual } from './LineaManual'
+import { indiceLote } from './lotesTurnoDatos'
+import type { Accion } from './hayQueHacerDatos'
+import { cuentaDelTurno } from './cuantoLlevamosDatos'
+import { armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
-import { PRECISION_ESTIMADO_PCT, desgloseP0 } from '@/services/grader/espejo/motivoP0'
 
 type Datos = DatosGraderVivo
-
-/** Lote «720260739» → «720.260.739», como lo muestra Matrix. */
-function loteLegible(l: string): string {
-  return /^\d+$/.test(l) ? milesPunto(Number(l)) : l
-}
 
 function useAncho<T extends HTMLElement>(): [React.RefObject<T>, number] {
   const ref = useRef<T>(null)
@@ -72,246 +70,6 @@ function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   )
 }
 
-function Cifra({ k, v, s, chico }: { k: string; v: string; s: string; chico?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[13px] leading-[18px] text-muted-foreground">{k}</p>
-      <p className={cn('mt-1 font-semibold tracking-tight tabular-nums text-foreground', chico ? 'text-[20px] leading-[32px] lg:leading-[38px]' : 'text-[28px] leading-[32px] lg:text-[32px] lg:leading-[38px]')}>{v}</p>
-      <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{s}</p>
-    </div>
-  )
-}
-
-function Cifras({ d }: { d: Datos }) {
-  const s = d.salida
-  const parcial = s && s.minutos < 60 ? `últimos ${s.minutos} min, llevado a la hora` : 'última hora · Gate 1 en adelante'
-  const t = d.totales
-  const lote = d.serie.lote
-  return (
-    <Tarjeta titulo="El grader ahora" icono={<Gauge className={IC} />}>
-      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
-        <Cifra k="Piezas/h de salida" v={s ? milesPunto(s.piezasH) : '—'} s={parcial} />
-        <Cifra k="kg/h de salida" v={s ? milesPunto(s.kgH) : '—'} s={s?.pesoMedio ? `peso medio ${coma1(s.pesoMedio)} kg` : 'sin pesos'} />
-        {t.p0 !== null ? (
-          <Cifra k="P0 del turno" v={`${coma1(t.p0)} %`} s={`${milesPunto(t.g0)} de ${milesPunto(t.piezas)} piezas`} />
-        ) : (
-          <Cifra
-            k="P0 del turno"
-            v="—"
-            s={t.piezas >= PIEZAS_PARA_DECIR_SIN_GATE0 ? 'P0 llega con Puerta 0' : 'sin rechazos todavía'}
-          />
-        )}
-        <Cifra
-          k="Lote en curso"
-          v={lote ? loteLegible(lote.lote) : '—'}
-          s={lote ? `desde las ${horaDelEje(d.serie.t0Ms, lote.desdeMin)} · ${milesPunto(lote.piezas)} piezas` : 'sin lote'}
-          chico
-        />
-      </div>
-    </Tarjeta>
-  )
-}
-
-/* Los trazos del Ritmo en vivo: el grader en el acento (2,5 px), las Baader como la curva de referencia (gris 1,5 px). */
-const GRADER = 'var(--v2-acento)'
-const BAADER = 'rgb(var(--muted-foreground) / 0.65)'
-
-/** Une las detenciones por dueño para no apilar transparencias (tres Baader paradas = una banda). */
-function bandas(paradas: Datos['paradas']): Array<{ desde: number; hasta: number; dueno: DuenoPerdida }> {
-  const por = new Map<DuenoPerdida, Array<[number, number]>>()
-  for (const p of paradas) {
-    const l = por.get(p.dueno) ?? []
-    l.push([p.desde, p.hasta])
-    por.set(p.dueno, l)
-  }
-  const out: Array<{ desde: number; hasta: number; dueno: DuenoPerdida }> = []
-  for (const [dueno, iv] of por) {
-    iv.sort((a, b) => a[0] - b[0])
-    let cur: [number, number] | null = null
-    for (const x of iv) {
-      if (cur && x[0] <= cur[1]) cur[1] = Math.max(cur[1], x[1])
-      else { if (cur) out.push({ desde: cur[0], hasta: cur[1], dueno }); cur = [x[0], x[1]] }
-    }
-    if (cur) out.push({ desde: cur[0], hasta: cur[1], dueno })
-  }
-  return out
-}
-
-function Curva({ d }: { d: Datos }) {
-  const [ref, w] = useAncho<HTMLDivElement>()
-  const h = w >= 600 ? 240 : 180
-  const L = d.retraso.min
-  // «r» es la correlación de las dos curvas; en pantalla va en palabras (pedido del recorrido del 22-11).
-  const sub = d.retraso.medido
-    ? `La curva del grader va ${L} min atrasada: es lo que tarda una pieza en llegar de las Baader al grader, medido en este turno (las curvas coinciden ${(d.retraso.r ?? 0) >= 0.8 ? 'bien' : 'a medias'}).`
-    : `La curva del grader va ${L} min atrasada: lo que tarda una pieza en llegar de las Baader al grader, según la ${RETRASO_REFERENCIA_FUENTE}. Este turno aún no alcanza para medirlo.`
-  return (
-    <Tarjeta titulo="Piezas por minuto" sub={sub} icono={<Activity className={IC} />}>
-      <div ref={ref} className="mt-3 w-full">
-        {w > 0 && <CurvaSvg d={d} w={w} h={h} />}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] leading-[18px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-4 rounded-full" style={{ background: GRADER }} />Grader</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: BAADER }} />3 Baader 142</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.mantencion} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.mantencion}` }} />Detención Mantención</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.externo} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.externo}` }} />Otras detenciones</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 border border-dashed" style={{ borderColor: 'var(--v2-gris)' }} />Programada</span>
-      </div>
-    </Tarjeta>
-  )
-}
-
-function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
-  const ml = 30
-  const mr = 8
-  const mt = 12
-  const mb = 22
-  const W = Math.max(10, w - ml - mr)
-  const H = h - mt - mb
-  const n = d.n
-  const L = d.retraso.min
-  const g = movil(d.serie.pz.slice(0, d.serie.hastaMin), 3)
-  // Las Baader se dibujan desde que empieza su serie (antes van en NaN: sin cobertura).
-  const b0 = d.baader ? Math.max(0, d.baader.findIndex((v) => Number.isFinite(v))) : 0
-  const b = d.baader ? movil(d.baader.slice(b0, Math.min(d.baader.length, n)), 3) : []
-  let tope = 10
-  for (const v of g) tope = Math.max(tope, v)
-  for (const v of b) tope = Math.max(tope, v)
-  const paso = tope > 60 ? 20 : 10
-  const max = Math.ceil(tope / paso) * paso
-  const x = (m: number) => ml + (W * Math.max(0, Math.min(n, m))) / n
-  const y = (v: number) => mt + H - (H * Math.min(v, max)) / max
-  const traza = (vals: number[], corre: number) => {
-    let s = ''
-    for (let i = 0; i < vals.length; i++) {
-      const m = i - corre
-      if (m < 0 || m > n) continue
-      s += `${s ? 'L' : 'M'}${x(m).toFixed(1)} ${y(vals[i] ?? 0).toFixed(1)}` // decimal-tecnico: ruta SVG, el punto es obligatorio
-    }
-    return s
-  }
-  const cada = W / n >= 1.6 ? 60 : 120
-  const minDia = Math.floor(d.serie.t0Ms / 60_000)
-  const primera = (60 - (((minDia % 60) + 60) % 60)) % 60
-  const marcas: number[] = []
-  for (let m = primera; m <= n; m += cada) marcas.push(m)
-  const rayas: number[] = []
-  for (let v = 0; v <= max; v += paso) rayas.push(v)
-  const ultima = d.serie.hastaMin - L
-  return (
-    <svg width={w} height={h} role="img" aria-label="Piezas por minuto del grader y de las Baader" className="block">
-      {rayas.map((v) => (
-        <g key={v}>
-          <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-          <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
-        </g>
-      ))}
-      {/* Detenciones como las bandas del Ritmo en vivo: velo del tono con su borde arriba; la programada, solo contorno punteado. */}
-      {bandas(d.paradas).map((p, i) => {
-        const bx = x(p.desde)
-        const bw = Math.max(1, x(p.hasta) - x(p.desde))
-        if (p.dueno === 'programado') {
-          return <rect key={i} x={bx} y={mt} width={bw} height={H} rx={2} fill="none" stroke="var(--v2-gris)" strokeDasharray="3 3" />
-        }
-        const tono = RELLENO_DUENO[p.dueno]
-        return (
-          <g key={i}>
-            <rect x={bx} y={mt} width={bw} height={H} fill={tono} fillOpacity={0.14} />
-            <line x1={bx} x2={bx + bw} y1={mt} y2={mt} stroke={tono} strokeOpacity={0.7} strokeWidth={2} />
-          </g>
-        )
-      })}
-      {marcas.map((m) => (
-        <text key={m} x={x(m)} y={h - 6} textAnchor="middle" fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, m)}</text>
-      ))}
-      {b.length > 0 && <path d={traza(b, -b0)} fill="none" stroke={BAADER} strokeWidth={1.5} strokeLinejoin="round" />}
-      <path d={traza(g, L)} fill="none" stroke={GRADER} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" data-serie="grader" />
-      {ultima > 0 && ultima < n && (
-        <>
-          <line x1={x(ultima)} x2={x(ultima)} y1={mt} y2={mt + H} stroke="rgb(var(--foreground) / 0.35)" strokeWidth={1} />
-          <circle cx={x(ultima)} cy={y(g[g.length - 1] ?? 0)} r={4.5} fill={GRADER} stroke="rgb(var(--background))" strokeWidth={2} />
-        </>
-      )}
-    </svg>
-  )
-}
-
-function P0Barras({ d }: { d: Datos }) {
-  const [ref, w] = useAncho<HTMLDivElement>()
-  const ts = d.p0
-  const h = 130
-  const ml = 38
-  const mr = 8
-  const mt = 8
-  const mb = 20
-  const W = Math.max(10, w - ml - mr)
-  const H = h - mt - mb
-  let tope = 6
-  for (const t of ts) if (t.pct !== null && !t.pocaMasa) tope = Math.max(tope, Math.ceil(t.pct))
-  const y = (v: number) => mt + H - (H * Math.min(v, tope)) / tope
-  const bw = ts.length > 0 ? W / Math.max(ts.length, 8) : W
-  const umbral = DEFAULT_P0_CRITICAL_PCT
-  return (
-    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo${d.pesca && d.pesca.p0Dueno.exactitud !== 'exacto' && d.pesca.p0Dueno.pz > 0 ? ' · estimado' : ''}`} icono={<ShieldAlert className={IC} />}>
-      <div ref={ref} className="mt-3 w-full">
-        {d.totales.p0 === null ? (
-          <p className="py-6 text-center text-[13px] text-muted-foreground">
-            {d.totales.piezas >= PIEZAS_PARA_DECIR_SIN_GATE0 ? 'P0 llega con Puerta 0: este informe no trae piezas de Gate 0.' : 'Sin rechazos todavía.'}
-          </p>
-        ) : w > 0 && (
-          <svg width={w} height={h} role="img" aria-label="P0 por tramo de 15 minutos" className="block">
-            {[0, Math.round(tope / 2), tope].map((v) => (
-              <g key={v}>
-                <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v} %</text>
-              </g>
-            ))}
-            {ts.map((t, i) => {
-              if (t.pct === null) return null
-              const alto = !t.pocaMasa && t.pct - umbral > 1e-9 /* la misma comparación de la regla */
-              const x0 = ml + i * bw + 1
-              const w0 = Math.max(1, bw - 2)
-              const titulo = `${t.rotulo}: ${coma1(t.pct)} % (${milesPunto(t.g0)} de ${milesPunto(t.total)})`
-              if (t.mantPz != null && !t.pocaMasa && t.total > 0) {
-                // Apilada por dueño: seteo y pesca abajo, Mantención arriba (como en el mockup).
-                const pctM = (t.mantPz / t.total) * 100
-                const pctS = Math.max(0, t.pct - pctM)
-                return (
-                  <g key={t.desde} data-tramo={t.rotulo}>
-                    <rect x={x0} y={y(pctS)} width={w0} height={mt + H - y(pctS)} rx={2} fill="var(--v2-ext)" fillOpacity={0.6} />
-                    <rect x={x0} y={y(t.pct)} width={w0} height={y(pctS) - y(t.pct)} rx={2} fill="var(--v2-mant)" />
-                    <title>{`${titulo} · Mantención ${milesPunto(Math.round(t.mantPz))}, seteo ${milesPunto(Math.round(t.g0 - t.mantPz))}`}</title>
-                  </g>
-                )
-              }
-              return (
-                <rect
-                  key={t.desde}
-                  x={x0}
-                  y={y(t.pct)}
-                  width={w0}
-                  height={mt + H - y(t.pct)}
-                  rx={2}
-                  data-tramo={t.rotulo}
-                  fill={t.pocaMasa ? 'var(--v2-prog)' : alto ? 'var(--v2-mal)' : 'var(--v2-acento)'}
-                  fillOpacity={t.pocaMasa || alto ? 1 : 0.5}
-                >
-                  <title>{titulo}</title>
-                </rect>
-              )
-            })}
-            <line x1={ml} x2={w - mr} y1={y(umbral)} y2={y(umbral)} stroke="var(--v2-mal)" strokeWidth={1} strokeDasharray="2 4" />
-            {ts.map((t, i) => (i % 4 === 0 ? (
-              <text key={`h${t.desde}`} x={ml + i * bw} y={h - 4} fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, t.desde)}</text>
-            ) : null))}
-          </svg>
-        )}
-      </div>
-    </Tarjeta>
-  )
-}
-
-/** Las barras de la cascada «Dónde se fueron las piezas»: 2,5 de alto sobre `bg-muted`, la cifra a la derecha. */
 function Reparto({ titulo, filas }: { titulo: string; filas: Array<{ clave: string; pct: number }> }) {
   return (
     <div>
@@ -347,101 +105,7 @@ function CalibreCalidad({ d }: { d: Datos }) {
   )
 }
 
-function LineaManual({ d }: { d: Datos }) {
-  const filas = d.manual
-  const leidas = filas.filter((f) => f.diferencia !== null)
-  const tope = Math.max(1, ...leidas.map((f) => Math.abs(f.diferencia ?? 0)))
-  const total = leidas.reduce((a, f) => a + (f.diferencia ?? 0), 0)
-  const sinLectura = filas.length - leidas.length
-  return (
-    <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora" icono={<Hand className={IC} />}>
-      {!d.baader ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin la serie por minuto de Shoplogix no se puede restar.</p>
-      ) : filas.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
-      ) : (
-        <div className="mt-3 space-y-1.5">
-          {filas.map((f) => f.diferencia === null ? (
-            <div key={f.hora} data-hora={f.hora} data-sin-lectura className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
-              <span className="tabular-nums text-foreground/80">{f.hora}</span>
-              <span className="h-2.5 rounded-full border border-dashed border-border" aria-hidden />
-              <span className="text-right text-[12px] text-muted-foreground">sin lectura</span>
-            </div>
-          ) : (
-            <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
-              <span className="tabular-nums text-foreground/80">{f.hora}</span>
-              <span className="relative h-2.5 rounded-full bg-muted">
-                <span aria-hidden className="absolute inset-y-[-3px] left-1/2 w-px bg-foreground/25" />
-                <span
-                  className={cn('absolute inset-y-0 rounded-full', f.diferencia >= 0 ? 'left-1/2' : 'right-1/2')}
-                  style={{ width: `${(Math.abs(f.diferencia) / tope) * 50}%`, background: f.diferencia >= 0 ? 'var(--v2-acento)' : 'var(--v2-gris)' }}
-                />
-              </span>
-              <span className="text-right font-semibold tabular-nums text-foreground">{f.diferencia > 0 ? '+' : f.diferencia < 0 ? '−' : ''}{milesPunto(Math.abs(f.diferencia))}</span>
-            </div>
-          ))}
-          <p className="pt-1.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
-            {leidas.length} {leidas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas.{sinLectura > 0 ? ` ${sinLectura === 1 ? 'Una hora queda' : `${sinLectura} horas quedan`} fuera: el espejo no la leyó entera.` : ''} La hora en curso entra al cerrar.
-          </p>
-        </div>
-      )}
-    </Tarjeta>
-  )
-}
-
 type Pesca = NonNullable<Datos['pesca']>
-
-/** Una fila de barra horizontal: rótulo, barra 2,5 sobre `bg-muted`, cifra a la derecha y una línea de detalle. */
-function FilaBarra({ rotulo, n, pct, tono, detalle }: { rotulo: string; n: number; pct: number; tono: string; detalle?: string }) {
-  return (
-    <div>
-      <div className="grid grid-cols-[minmax(0,150px)_1fr_44px] items-center gap-2.5 text-[13px] leading-[18px]">
-        <span className="truncate font-medium text-foreground">{rotulo}</span>
-        <span className="h-2.5 overflow-hidden rounded-full bg-muted">
-          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tono }} />
-        </span>
-        <span className="text-right font-semibold tabular-nums text-foreground">{milesPunto(n)}</span>
-      </div>
-      {detalle && <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{detalle}</p>}
-    </div>
-  )
-}
-
-/** Etapa 2: por qué va a P0, por dueño (Mantención / seteo y pesca). Exacto con Puerta 0; si no, estimado. */
-function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
-  const r = p.p0Dueno
-  const tot = Math.max(1, r.pz)
-  const t = d.totales
-  const ultHora = d.p0.filter((x) => x.completo).slice(-4)
-  const hTot = ultHora.reduce((s, x) => s + x.total, 0)
-  const hG0 = ultHora.reduce((s, x) => s + x.g0, 0)
-  const sub = `${milesPunto(r.pz)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
-  const desglose = desgloseP0(r)
-  const pctExacto = r.pctExacto === null ? 0 : r.pctExacto
-  // «exacto» del estimado = precisión medida de «tenía gate» contra Puerta 0; en mixto, cuántas piezas traen su motivo.
-  const fuente = r.exactitud === 'exacto'
-    ? 'motivo de Matrix (Puerta 0)'
-    : r.exactitud === 'mixto'
-      ? `motivo de Matrix en el ${Math.round(pctExacto)} % de las piezas · resto estimado`
-      : `estimado · ${PRECISION_ESTIMADO_PCT} % exacto`
-  const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k === 'No leído por fotocélula' ? 'Fotocélula' : k} {milesPunto(n)}</p> : null)
-  return (
-    <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>
-      {r.pz === 0 ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin piezas en Gate 0 todavía.</p>
-      ) : (
-        <div className="mt-3 space-y-2.5">
-          <FilaBarra rotulo="Mantención" n={r.mantencion.pz} pct={(r.mantencion.pz / tot) * 100} tono="var(--v2-mant)" detalle={`${milesPunto(Math.round(r.mantencion.kg))} kg`} />
-          {desglose.mantencion.map((x) => linea(x.rotulo, x.pz))}
-          <FilaBarra rotulo="Seteo y pesca" n={r.seteo.pz} pct={(r.seteo.pz / tot) * 100} tono="var(--v2-ext)" detalle={`${milesPunto(Math.round(r.seteo.kg))} kg`} />
-          {desglose.seteo.map((x) => linea(x.rotulo, x.pz))}
-          {r.sinReparto.pz > 0 && <FilaBarra rotulo="Sin reparto" n={r.sinReparto.pz} pct={(r.sinReparto.pz / tot) * 100} tono="var(--v2-gris)" detalle="Sin peso: no se puede repartir." />}
-          <p className="pt-1 text-[12px] leading-[16px] text-muted-foreground">Fuente: {fuente}.</p>
-        </div>
-      )}
-    </Tarjeta>
-  )
-}
 
 const TONO_810 = 'rgb(var(--muted-foreground) / 0.65)'
 
@@ -517,30 +181,6 @@ function BordesGate({ p }: { p: Pesca }) {
 }
 
 /** Etapa 5: lote en curso, peso de la última hora contra el turno y los últimos 6 turnos. */
-function LoteYPesca({ p }: { p: Pesca }) {
-  const l = p.lote
-  const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v)} %`)
-  const kg = (v: number | null) => (v === null ? '—' : `${coma1(v)} kg`)
-  return (
-    <Tarjeta titulo={l ? `Lote ${loteLegible(l.lote)}` : 'Lote en curso'} sub={l ? `desde las ${l.desdeTs.slice(11, 16)} · ${milesPunto(l.piezas)} piezas` : undefined} icono={<Package className={IC} />}>
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
-          {l && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-              <Cifra chico k="Calibre dominante" v={l.perfil.calibreDominante?.calibre.replace(' lb', '') ?? '—'} s={pct(l.perfil.calibreDominante?.pct)} />
-              <Cifra chico k="10-12 lb" v={pct(l.perfil.calibrePct['10-12 lb'] ?? 0)} s={l.anterior ? `antes ${pct(l.anterior.perfil.calibrePct['10-12 lb'] ?? 0)}` : 'primer lote'} />
-              <Cifra chico k="Premium" v={l.perfil.premiumPct === null ? '—' : `${coma1(l.perfil.premiumPct)} %`} s={l.anterior?.perfil.premiumPct != null ? `antes ${coma1(l.anterior.perfil.premiumPct)} %` : ''} />
-              <Cifra chico k="Peso medio" v={kg(l.perfil.pesoMedioKg)} s={l.anterior ? `antes ${kg(l.anterior.perfil.pesoMedioKg)}` : ''} />
-            </div>
-          )}
-          <HistPeso p={p} />
-        </div>
-        <TurnosAnteriores filas={p.filas} />
-      </div>
-    </Tarjeta>
-  )
-}
-
 function HistPeso({ p }: { p: Pesca }) {
   const [ref, w] = useAncho<HTMLDivElement>()
   const h = 150
@@ -555,9 +195,8 @@ function HistPeso({ p }: { p: Pesca }) {
   const bw = W / a.length
   const y = (v: number) => mt + H - (H * v) / tope
   return (
-    <div>
-      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Peso, última hora contra el turno (cada 250 g)</p>
-      <div ref={ref} className="w-full">
+    <Tarjeta titulo="Peso" sub="Última hora contra el turno, cada 250 g" icono={<Scale className={IC} />}>
+      <div ref={ref} className="mt-3 w-full">
         {w > 0 && (
           <svg width={w} height={h} role="img" aria-label="Distribución de peso cada 250 g" className="block">
             {[0, tope / 2, tope].map((v) => (
@@ -578,65 +217,37 @@ function HistPeso({ p }: { p: Pesca }) {
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3 rounded-[3px]" style={{ background: 'var(--v2-acento)', opacity: 0.7 }} />Última hora · media {p.histHora.mediaKg === null ? '—' : `${coma1(p.histHora.mediaKg)} kg`}</span>
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: TONO_810 }} />Turno · media {p.histTurno.mediaKg === null ? '—' : `${coma1(p.histTurno.mediaKg)} kg`}</span>
       </div>
-    </div>
-  )
-}
-
-function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
-  const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v)} %`)
-  return (
-    <div className="overflow-x-auto">
-      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Este turno (primera fila) y los 6 anteriores (cierre)</p>
-      <table className="w-full text-[13px] leading-[18px] tabular-nums">
-        <thead>
-          <tr className="text-[12px] text-muted-foreground">
-            <th className="py-1 pr-2 text-left font-normal">Turno</th>
-            <th className="py-1 pr-2 text-right font-normal">pz/h</th>
-            <th className="py-1 pr-2 text-right font-normal">P0</th>
-            <th className="py-1 pr-2 text-right font-normal">kg</th>
-            <th className="py-1 pr-2 text-right font-normal">6-8</th>
-            <th className="py-1 pr-2 text-right font-normal">8-10</th>
-            <th className="py-1 text-right font-normal">10-12</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filas.map((f, i) => (
-            <tr key={f.rotulo} className={cn('border-t border-border/60', i === 0 && 'font-semibold text-foreground')}>
-              <td className="whitespace-nowrap py-1 pr-2">{f.rotulo}</td>
-              <td className="py-1 pr-2 text-right">{f.pzH === null ? '—' : milesPunto(f.pzH)}</td>
-              <td className="py-1 pr-2 text-right">{f.p0Pct === null ? '—' : `${coma1(f.p0Pct)} %`}</td>
-              <td className="py-1 pr-2 text-right">{f.pesoMedioKg === null ? '—' : coma1(f.pesoMedioKg)}</td>
-              <td className="py-1 pr-2 text-right">{pct(f.c68)}</td>
-              <td className="py-1 pr-2 text-right">{pct(f.c810)}</td>
-              <td className="py-1 text-right">{pct(f.c1012)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {filas.length === 1 && <p className="mt-1.5 text-[12px] text-muted-foreground">Sin resúmenes de cierre de los días anteriores.</p>}
-    </div>
+    </Tarjeta>
   )
 }
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
 export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
-  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
+  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto, baaderCada5 } = props
   const d = useMemo(
-    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto }),
-    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
+    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto }),
+    [cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto],
   )
+  const [hoja, setHoja] = useState<HojaP0>(null)
+  const [loteAbierto, setLoteAbierto] = useState<number | null>(null)
   // Sin piezas del turno: solo las alertas (el lector caído antes del cambio de turno tiene que verse).
   if (d.serie.hastaMin === 0) {
     return d.alertas.length > 0 ? <div className="v2-vars" data-testid="grader-vivo"><Alertas d={d} ultimaHora={null} /></div> : null
   }
   const ultimaHora = d.serie.ultimaTs ? d.serie.ultimaTs.slice(11, 16) : null
+  const abrirAccion = (a: Accion) => {
+    if (a.destino.tipo === 'tramo') setHoja({ tipo: 'tramo', desdeMin: Math.max(0, Math.floor((a.destino.desdeMs - d.serie.t0Ms) / 60_000)) })
+    else if (a.destino.tipo === 'combo') setHoja({ tipo: 'fila', clave: 'calibre' })
+    else if (a.destino.tipo === 'lote') setLoteAbierto(indiceLote(d.lotes, a.destino.lote))
+  }
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
-      <div className="grid gap-3 lg:grid-cols-[2fr_3fr]">
+      <div className="grid gap-3 lg:grid-cols-3">
         <Alertas d={d} ultimaHora={ultimaHora} />
-        <Cifras d={d} />
+        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
+        {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} onAbrir={abrirAccion} />}
       </div>
-      <Curva d={d} />
+      <GraficoVivo d={d} onAbrirLote={setLoteAbierto} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />
       {d.pesca?.seteo && (
         <>
           <SeteoGates s={d.pesca.seteo} />
@@ -645,18 +256,41 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
       )}
       {d.pesca && (
         <>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <CausasP0 d={d} p={d.pesca} />
-            <ZonaCompartida p={d.pesca} />
+          <div className="grid items-start gap-3 lg:grid-cols-2">
+            <PorQueP0 a={d.pesca.arbol} piezasTurno={d.totales.piezas} hasta={ultimaHora ?? ''} onAbrir={(k) => setHoja({ tipo: 'fila', clave: k })} />
+            <div className="grid gap-3">
+              <LotesDelTurno filas={d.lotes} t0Ms={d.serie.t0Ms} hastaMin={d.serie.hastaMin} onAbrir={setLoteAbierto} />
+              <LineaManual d={d} enCurso={turnoEnCurso} />
+            </div>
           </div>
-          <LoteYPesca p={d.pesca} />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <ZonaCompartida p={d.pesca} />
+            <HistPeso p={d.pesca} />
+          </div>
+          <HojaLote filas={d.lotes} k={loteAbierto} t0Ms={d.serie.t0Ms} onCerrar={() => setLoteAbierto(null)} />
+          <HojasP0
+            hoja={hoja}
+            onCerrar={() => setHoja(null)}
+            a={d.pesca.arbol}
+            t0Ms={d.serie.t0Ms}
+            hastaMin={d.serie.hastaMin}
+            piezas={d.pesca.piezas}
+            porPieza={d.pesca.p0Dueno.porPieza}
+            sinLectura={d.sinLectura}
+            g0={d.serie.g0}
+            hasta={ultimaHora ?? ''}
+          />
         </>
       )}
-      <div className="grid gap-3 lg:grid-cols-3">
-        <P0Barras d={d} />
+      {/* Con piezas, la Línea manual ya vive junto al árbol: Calibre y calidad va a todo el ancho (no queda sola en 2 columnas). */}
+      {d.pesca ? (
         <CalibreCalidad d={d} />
-        <LineaManual d={d} />
-      </div>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <CalibreCalidad d={d} />
+          <LineaManual d={d} enCurso={turnoEnCurso} />
+        </div>
+      )}
     </div>
   )
 }

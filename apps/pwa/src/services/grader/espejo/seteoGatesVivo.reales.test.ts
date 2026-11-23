@@ -1,6 +1,6 @@
 /** Seteo de las 12 gates en vivo (E-F) sobre los 3 turnos reales y casos armados. Cifras del mockup v5 (21-11). */
 import { describe, expect, it } from 'vitest'
-import { seteoGatesVivo, tramosDeGate } from './seteoGatesVivo'
+import { rangoProgramaKg, seteoGatesVivo, tramosDeGate } from './seteoGatesVivo'
 import { TURNOS_REALES, piezasHasta, turnoReal, type TurnoReal } from './__fixtures__/turnosReales'
 import type { PiezaEspejo } from './espejoFilas'
 import type { CalibreRange } from '../types'
@@ -142,5 +142,18 @@ describe('casos armados', () => {
     const t = tramosDeGate(3, ps)
     expect(t.tramos.map((x) => x.etiqueta)).toEqual(['4-6 lb · Premium'])
     expect(t.cambios).toEqual([])
+  })
+})
+
+describe('rangoProgramaKg', () => {
+  it('convierte el calibre programado a kg', () => {
+    const r = rangoProgramaKg('8-10 lb · Premium')!
+    expect(r.lo).toBeCloseTo(3.629, 2)
+    expect(r.hi).toBeCloseTo(4.536, 2)
+  })
+  it('12-UP no tiene tope y «Poco flujo» no tiene rango', () => {
+    expect(rangoProgramaKg('12-UP lb · Premium')).toMatchObject({ hi: null })
+    expect(rangoProgramaKg('Poco flujo')).toBeNull()
+    expect(rangoProgramaKg(null)).toBeNull()
   })
 })

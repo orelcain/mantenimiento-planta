@@ -51,6 +51,32 @@ export function baaderEnEje(s: SerieMinutoBaader | null | undefined, t0Ms: numbe
   return out
 }
 
+/** Largo de una cubeta del respaldo de Shoplogix (min). */
+export const CUBETA_RESPALDO_MIN = 5
+
+/**
+ * Respaldo sin serie por minuto: las cubetas de 5 min de Shoplogix (`{ t, pieces }`, t = inicio, hora de planta como
+ * UTC) repartidas parejo en sus 5 minutos (pieces / 5). Solo cubetas CERRADAS antes de `hastaMs`; una cubeta que falta
+ * queda en `NaN` (sin cobertura, no 0). `null` sin cubetas cerradas.
+ */
+export function serieDesdeCada5(cubetas: ReadonlyArray<{ t: string; pieces: number }>, hastaMs = Number.POSITIVE_INFINITY): SerieMinutoBaader | null {
+  const ms = (t: string) => Date.parse(t.endsWith('Z') ? t : `${t}Z`)
+  const paso = CUBETA_RESPALDO_MIN * 60_000
+  const ok = cubetas
+    .map((c) => ({ ms: ms(c.t), pz: c.pieces }))
+    .filter((c) => Number.isFinite(c.ms) && Number.isFinite(c.pz) && c.ms + paso <= hastaMs)
+    .sort((a, b) => a.ms - b.ms)
+  if (ok.length === 0) return null
+  const desde = ok[0]!.ms
+  const largo = Math.round((ok[ok.length - 1]!.ms - desde) / 60_000) + CUBETA_RESPALDO_MIN
+  const cycles = new Array<number>(largo).fill(NaN)
+  for (const c of ok) {
+    const k0 = Math.round((c.ms - desde) / 60_000)
+    for (let k = k0; k < k0 + CUBETA_RESPALDO_MIN && k < largo; k++) cycles[k] = (Number.isNaN(cycles[k]!) ? 0 : cycles[k]!) + c.pz / CUBETA_RESPALDO_MIN
+  }
+  return { desde: new Date(desde).toISOString(), maquinas: [{ cycles }] }
+}
+
 function pearson(a: number[], b: number[]): number | null {
   const n = a.length
   if (n < 2) return null

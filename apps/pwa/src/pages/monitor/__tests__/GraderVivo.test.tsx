@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeAll } from 'vitest'
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import real from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-19-turno2-minutos.json'
 import type { CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
@@ -6,6 +6,13 @@ import { GraderVivo } from '../GraderVivo'
 import { armarGraderVivo, type EntradaGraderVivo } from '../graderVivoDatos'
 
 afterEach(cleanup)
+
+// happy-dom no tiene canvas: ECharts se simula y se revisa la opción que recibe.
+vi.mock('echarts-for-react', () => ({
+  default: ({ option }: { option: { series: Array<{ id: string; data: unknown[] }> } }) => (
+    <div data-testid="echarts" data-series={option.series.map((x) => `${x.id}:${x.data.length}`).join(',')} />
+  ),
+}))
 
 beforeAll(() => {
   // happy-dom mide 0: el gráfico necesita un ancho para dibujarse.
@@ -92,22 +99,22 @@ describe('GraderVivo', () => {
     expect(screen.queryByText('0,0 %')).toBeNull()
   })
 
-  it('dibuja la curva del grader y el lote legible', () => {
+  it('dibuja el gráfico (grader, Baader y P0) y «¿Cuánto llevamos?»', () => {
     render(<GraderVivo {...entrada({})} />)
-    expect(document.querySelector('[data-serie="grader"]')?.getAttribute('d')?.length).toBeGreaterThan(100)
-    expect(screen.getByText('720.260.739')).toBeTruthy()
-    expect(screen.getByText(/va \d+ min atrasada: es lo que tarda una pieza .* medido en este turno \(las curvas coinciden (bien|a medias)\)/)).toBeTruthy()
+    const series = screen.getByTestId('echarts').getAttribute('data-series') ?? ''
+    expect(series).toMatch(/grader:\d{3}/)
+    expect(series).toMatch(/baader:\d{3}/)
+    expect(series).toMatch(/p0:\d+/)
+    expect(screen.getByTestId('cuanto-llevamos').textContent).toMatch(/^[\d.]+ pz[\d.]+ kg$/)
+    expect(screen.getByText(/Baader corridas \d+ min: lo que tarda una pieza .* medido en este turno \(las curvas coinciden (bien|a medias)\)/)).toBeTruthy()
     expect(screen.queryByText(/\(r 0,/)).toBeNull()
-    // Eje de P0 cada 15 min con «%»; el de piezas por minuto, sin él.
-    const ejeP0 = [...document.querySelectorAll('svg[aria-label="P0 por tramo de 15 minutos"] text')].map((t) => t.textContent ?? '')
-    expect(ejeP0.slice(0, 3).every((t) => / %$/.test(t))).toBe(true)
-    expect([...document.querySelectorAll('svg text')].filter((t) => !t.closest('svg[aria-label="P0 por tramo de 15 minutos"]')).some((t) => / %$/.test(t.textContent ?? ''))).toBe(false)
   })
 
   it('la línea manual muestra horas completas y la de las 08:00 sale', () => {
     render(<GraderVivo {...entrada({})} />)
     expect(document.querySelector('[data-hora="08:00"]')).toBeTruthy()
-    expect(document.querySelector('[data-hora="10:00"]')).toBeNull() // en curso a las 10:50
+    // La hora abierta (10:00 a las 10:50) va como «en curso», sin cifra.
+    expect(document.querySelector('[data-hora="10:00"]')?.getAttribute('data-tipo')).toBe('enCurso')
   })
 
   it('P4: sin piezas pero con el lector caído, la alerta se ve igual', () => {

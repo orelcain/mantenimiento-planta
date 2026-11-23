@@ -2,18 +2,23 @@
  * Banco de pruebas de «Grader en vivo» (pestaña Grader del monitor, E-A). SOLO DEV: la ruta no se registra en
  * producción (ver App.tsx).
  *
- * Monta `GraderVivo` con el turno REAL del 19-11 T2 de Chonchi (piezas, Gate 0 y kg por minuto del Pieza pieza
- * cargado por Excel, la serie por minuto de las 3 Baader y las paradas de Shoplogix), cortado a la hora que se elija,
- * sin Firestore ni login. El calibre y la calidad por minuto se reparten con la proporción real del turno.
+ * Monta `GraderVivo` con el turno REAL del 18-11 Turno 1 de Chonchi (el del mockup v4): todas las piezas del Excel
+ * Pieza pieza, la serie por minuto de las 3 Baader, las paradas de Shoplogix (Evisceradora 1) y la Puerta 0 del
+ * cierre, cortado a la hora que se elija, sin Firestore ni login. Por defecto trae el hueco REAL del espejo
+ * (23:39:26 → 00:28:51: sin piezas leídas mientras las Baader seguían).
+ *
+ * `?sinHueco=1`: el turno completo. `?b5=1`: las Baader del respaldo de 5 min (sin serie por minuto). `?p0=0`: sin Puerta 0 (el motivo queda «estimado»). `?publico=1`: la vista de
+ * quien no es admin.
  */
 import { useEffect, useMemo, useState } from 'react'
-import urlPiezas from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-19-turno_2.json.gz?url'
-import resumenes from '@/services/grader/espejo/__fixtures__/chonchi-resumenes-16-al-18-11.json'
+import urlPiezas from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-turno_1.json.gz?url'
+import extra from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-turno_1-extra.json'
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
-import type { CalibreRange, GraderDailySummary } from '@/services/grader/types'
+import { serieDesdeCada5, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import type { CalibreRange } from '@/services/grader/types'
+import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import '@/pages/monitor/monitorGlass.css'
-import real from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-19-turno2-minutos.json'
-import type { CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
+import { cubetasDe } from '@/services/grader/espejo/espejoMinutos'
 import { GraderVivo } from '@/pages/monitor/GraderVivo'
 import type { ParadaGrader } from '@/pages/monitor/graderVivoDatos'
 import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
@@ -38,49 +43,50 @@ const RECARGAS = [
   { recarga: 'cancelada 4000', error: '', parcial: false },
 ]
 
-const T0 = Date.parse(real.t0)
+const T0 = Date.parse(extra.t0)
+/** Fin de la vista: la última pieza del turno cae a las 05:29:45. */
+const FIN = Date.parse('2026-11-19T05:30:00.000Z')
+const MINUTOS = (FIN - T0) / 60_000
 const PROGRAMADA = /COLACION|REUNION|EJERCICIO|Limpieza/i
+const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams()
+/** El hueco real del espejo del 18-11 (ver `huecosEspejo.reales.test.ts`). */
+const HUECO: [string, string] | null = Q.has('sinHueco') ? null : ['2026-11-18T23:39:26', '2026-11-19T00:28:51']
+const CON_P0 = Q.get('p0') !== '0'
+const PUBLICO = Q.has('publico')
+const B5 = Q.has('b5')
 
-/** `?hueco=1`: el espejo no leyó de 09:00 a 09:40 (como el 18-11 23:39 → 00:28), para ver «sin lectura». */
-const HUECO: [number, number] | null = typeof location !== 'undefined' && new URLSearchParams(location.search).has('hueco') ? [105, 145] : null
-/** `?publico=1`: la vista de quien no es admin. */
-const PUBLICO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('publico')
+/** Las cubetas de 5 min de las 3 Baader sumadas (`extra.b5`, intervals de Shoplogix). */
+const CUBETAS_B5: Array<{ t: string; pieces: number }> = (() => {
+  const m = new Map<string, number>()
+  for (const maq of extra.b5) for (const iv of maq.intervals) m.set(iv.s, (m.get(iv.s) ?? 0) + iv.c)
+  return [...m.entries()].map(([t, pieces]) => ({ t, pieces }))
+})()
 
-function cubetas(hasta: number): CubetaMinuto[] {
-  const totCal = Object.values(real.calibreTurno).reduce((a, b) => a + b, 0)
-  const totCal2 = Object.values(real.calidadTurno).reduce((a, b) => a + b, 0)
-  const out: CubetaMinuto[] = []
-  for (let m = 0; m < hasta; m++) {
-    const pz = real.grader[m] ?? 0
-    if (pz <= 0 || (HUECO && m >= HUECO[0] && m < HUECO[1])) continue
-    const g0 = real.g0[m] ?? 0
-    const sal = pz - g0
-    const lote = m < 209 ? '720260738' : '720260739' // cambio real de lote a las 10:44
-    out.push({
-      ms: T0 + m * 60_000,
-      pz,
-      g0,
-      kgSalida: real.kgSalida[m] ?? 0,
-      pzPeso: sal,
-      calibre: Object.fromEntries(Object.entries(real.calibreTurno).map(([k, v]) => [k, (sal * v) / totCal])),
-      calidad: Object.fromEntries(Object.entries(real.calidadTurno).map(([k, v]) => [k, (sal * v) / totCal2])),
-      lotes: { [lote]: pz },
-      ultimoLote: lote,
-      ultimaTs: new Date(T0 + m * 60_000 + 59_000).toISOString(),
-    })
-  }
-  return out
-}
-
-const PARADAS: ParadaGrader[] = real.paradas.map((p) => ({
-  desdeMs: p.desdeMs,
-  hastaMs: p.hastaMs,
+const PARADAS: ParadaGrader[] = extra.paradas.map((p) => ({
+  desdeMs: Date.parse(p.desde),
+  hastaMs: Date.parse(p.hasta),
   dueno: PROGRAMADA.test(p.causa) ? 'programado' : 'externo',
 }))
 
-/** Las piezas reales del 19-11 T2 (todas, con gate y peso), del .gz de los tests. */
-function usePiezasReales(): PiezaEspejo[] | null {
-  const [p, setP] = useState<PiezaEspejo[] | null>(null)
+/** La Puerta 0 del cierre (192 piezas: 102 fuera de límites, 78 fotocélula, 12 puerta no preparada). */
+const PUERTA0: StoredGate0Record[] = extra.puerta0.map(([s, e, g, n]) => ({
+  ts: new Date(T0 + s! * 1000).toISOString(),
+  pieces: n!,
+  error: extra.errores[e!] ?? '',
+  weightKg: g! / 1000,
+}))
+
+interface CrudoTurno {
+  t0: string
+  baader: SerieMinutoBaader
+  dic: Record<'calidad' | 'calibre' | 'conservacion' | 'producto' | 'lote', string[]>
+  filas: number[][]
+}
+interface TurnoDev { piezas: PiezaEspejo[]; baader: SerieMinutoBaader }
+
+/** Las piezas reales del 18-11 T1 (todas, con gate y peso) y la serie de las Baader, del .gz de los tests. */
+function useTurnoReal(): TurnoDev | null {
+  const [p, setP] = useState<TurnoDev | null>(null)
   useEffect(() => {
     let vivo = true
     void (async () => {
@@ -90,13 +96,13 @@ function usePiezasReales(): PiezaEspejo[] | null {
       const txt = buf[0] === 0x1f && buf[1] === 0x8b
         ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
         : new TextDecoder().decode(buf)
-      const raw = JSON.parse(txt) as { t0: string; dic: Record<'calidad' | 'calibre' | 'conservacion' | 'producto' | 'lote', string[]>; filas: number[][] }
+      const raw = JSON.parse(txt) as CrudoTurno
       const t0 = Date.parse(raw.t0)
-      const out = raw.filas.map(([s, gate, g, n, q, c, co, pr, l]): PiezaEspejo => {
+      const piezas = raw.filas.map(([s, gate, g, n, q, c, co, pr, l]): PiezaEspejo => {
         const ts = new Date(t0 + s! * 1000).toISOString()
-        return { cadena: `${ts}#${gate}#${g}`, ts, fecha: ts.slice(0, 10), hora: ts.slice(11, 19), pesoKg: g! / 1000, cantidad: n!, lote: raw.dic.lote[l!] ?? '', gate: gate!, calidad: raw.dic.calidad[q!] ?? '', conservacion: raw.dic.conservacion[co!] ?? '', calibre: (raw.dic.calibre[c!] ?? '') as CalibreRange, producto: raw.dic.producto[pr!] ?? '', turnoMatrix: '' }
+        return { cadena: `${ts}#${gate}#${g}`, ts, fecha: ts.slice(0, 10), hora: ts.slice(11, 19), pesoKg: g! > 0 ? g! / 1000 : null, cantidad: n!, lote: raw.dic.lote[l!] ?? '', gate: gate!, calidad: raw.dic.calidad[q!] ?? '', conservacion: raw.dic.conservacion[co!] ?? '', calibre: (raw.dic.calibre[c!] ?? '') as CalibreRange, producto: raw.dic.producto[pr!] ?? '', turnoMatrix: '' }
       })
-      if (vivo) setP(out)
+      if (vivo) setP({ piezas, baader: raw.baader })
     })()
     return () => { vivo = false }
   }, [])
@@ -104,16 +110,23 @@ function usePiezasReales(): PiezaEspejo[] | null {
 }
 
 export default function GraderVivoDevPage() {
-  const [hasta, setHasta] = useState(215) // 10:50
-  const c = useMemo(() => cubetas(hasta), [hasta])
-  const todas = usePiezasReales()
-  const piezas = useMemo(() => {
-    if (!todas) return undefined
-    const lim = new Date(T0 + hasta * 60_000).toISOString()
-    const h = HUECO ? [new Date(T0 + HUECO[0] * 60_000).toISOString(), new Date(T0 + HUECO[1] * 60_000).toISOString()] : null
-    return todas.filter((p) => p.ts < lim && !(h && p.ts >= h[0]! && p.ts < h[1]!))
-  }, [todas, hasta])
-  const baader = useMemo(() => ({ desde: real.t0, maquinas: [{ cycles: real.baader.slice(0, Math.max(0, hasta - 2)) }] }), [hasta])
+  const [hasta, setHasta] = useState(435) // 04:30, la hora del mockup
+  const turno = useTurnoReal()
+  const lim = new Date(T0 + hasta * 60_000).toISOString()
+  const piezas = useMemo(
+    () => turno?.piezas.filter((p) => p.ts < lim && !(HUECO && p.ts >= HUECO[0] && p.ts < HUECO[1])),
+    [turno, lim],
+  )
+  const c = useMemo(() => cubetasDe(piezas ?? []), [piezas])
+  // Shoplogix publica los minutos con unos 3 min de atraso.
+  const baader = useMemo(() => {
+    if (!turno) return null
+    // `?b5=1`: el respaldo de 5 min de Shoplogix (cubetas cerradas de las 3 Baader), como si faltara la serie por minuto.
+    if (B5) return serieDesdeCada5(CUBETAS_B5, T0 + (hasta - 3) * 60_000)
+    const n = Math.max(0, Math.floor((T0 + hasta * 60_000 - Date.parse(turno.baader.desde)) / 60_000) - 3)
+    return { desde: turno.baader.desde, maquinas: turno.baader.maquinas.map((m) => ({ cycles: m.cycles.slice(0, n) })) }
+  }, [turno, hasta])
+  const gate0 = useMemo(() => (CON_P0 ? PUERTA0.filter((r) => r.ts < lim) : null), [lim])
   return (
     // `data-glass="v2"` + `<main>`: el mismo material de vidrio que la pestaña tiene en el monitor público.
     <div className="min-h-screen bg-background p-4 text-foreground" data-glass="v2">
@@ -124,7 +137,7 @@ export default function GraderVivoDevPage() {
             id="hasta"
             type="range"
             min={30}
-            max={real.grader.length}
+            max={MINUTOS}
             value={hasta}
             onChange={(e) => setHasta(Number(e.target.value))}
             className="flex-1"
@@ -134,14 +147,14 @@ export default function GraderVivoDevPage() {
         <GraderVivo
           cubetas={c}
           inicioMs={T0}
-          finMs={Date.parse('2026-11-19T15:00:00.000Z')}
+          finMs={FIN}
           baader={baader}
+          baaderCada5={B5}
           paradas={PARADAS}
           minutosSinLatido={1}
           turnoEnCurso
           piezas={piezas}
-          resumenes={resumenes as unknown as GraderDailySummary[]}
-          turnoActualId="2026-11-19__Turno 2"
+          gate0Exacto={gate0}
           publico={PUBLICO}
         />
         {/* 22-11: la tarjeta del espejo con el turno del encabezado, en público y admin, en curso y cerrado. */}

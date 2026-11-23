@@ -1,10 +1,15 @@
 /**
  * Motivo P0 por pieza: cruza las piezas de Gate 0 del espejo con los registros de Puerta 0 (Matrix, Excel) y
- * reparte el P0 entre Mantención (fotocélula, puerta) y seteo y pesca («Fuera de límites»). Sin registro exacto,
- * la pieza se estima con `causasP0Vivo` (seteo inferido de las piezas). Puro: sin Firestore ni DOM.
+ * reparte el P0 entre Mantención (fotocélula) y seteo y pesca («Fuera de límites» y «Puerta no preparada»). Sin
+ * registro exacto, la pieza se estima con `causasP0Vivo` (seteo inferido de las piezas). Puro: sin Firestore ni DOM.
+ *
+ * 23-11 (decisión aprobada, mockup v4): «Puerta no preparada» es de Seteo. La puerta no alcanza a volver porque el
+ * calibre carga muchas piezas seguidas en las mismas gates: se arregla repartiendo el calibre en más gates, no
+ * con mantención. Sin Puerta 0, «tenía gate» no separa fotocélula de puerta: esas piezas quedan en Mantención como
+ * estimado y así se rotulan.
  */
 import type { PiezaEspejo } from './espejoFilas'
-import { SeteoInferido, causasP0Vivo, type CausaP0 } from './pescaVivo'
+import { SeteoInferido, derivarP0, type CausaP0 } from './pescaVivo'
 import type { StoredGate0Record } from '../graderGate0Store'
 
 export type DuenoP0 = 'mantencion' | 'seteo'
@@ -12,7 +17,7 @@ export type DuenoP0 = 'mantencion' | 'seteo'
 /** Motivos exactos de Puerta 0 que sí dicen de quién son. Clave: texto normalizado (sin acentos, minúsculas). */
 const DUENO_DE_MOTIVO: Record<string, DuenoP0> = {
   'no leido por fotocelula': 'mantencion',
-  'puerta no preparada': 'mantencion',
+  'puerta no preparada': 'seteo',
   'fuera de limites': 'seteo',
 }
 
@@ -60,6 +65,12 @@ export interface PiezaP0 {
   exacto: boolean
   /** Causa estimada (seteo inferido). `null` si la pieza no tiene peso. */
   causa: CausaP0 | null
+  /** Calidad de la pieza, tal cual viene del espejo. */
+  calidad: string
+  /** Calibres en que cabe por peso (ver `derivarP0`). Vacío sin peso o bajo 900 g. */
+  calibres: string[]
+  /** Gates que en ese momento tenían su calibre (cualquier calidad), por calibre. */
+  gatesCalibre: Record<string, number[]>
 }
 
 export interface GrupoP0 {
@@ -94,16 +105,10 @@ function sumar(g: GrupoP0, p: PiezaP0): void {
   else g.estimadoPz += p.cantidad
 }
 
-/** Causa estimada de una pieza: la única clave de `causasP0Vivo` con piezas. */
-function causaDe(piezaGate0: PiezaEspejo, seteo: SeteoInferido): CausaP0 | null {
-  const c = causasP0Vivo([piezaGate0], seteo)
-  const k = (Object.keys(c.causas) as CausaP0[]).find((x) => c.causas[x] > 0)
-  return k ?? null
-}
-
 /** Clasifica todas las piezas de Gate 0 del turno (`piezas` puede traer gate>0: son el seteo inferido). */
 export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly StoredGate0Record[] | null): ResumenP0 {
   const seteo = new SeteoInferido(piezas)
+  const gates = seteo.gates()
   const g0 = piezas.filter((p) => p.gate === 0)
   const motivos = registros && registros.length > 0 ? cruzarPuerta0(g0, registros) : g0.map(() => null)
   const out: ResumenP0 = {
@@ -119,7 +124,8 @@ export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly
   }
   g0.forEach((p, i) => {
     const kg = p.pesoKg ?? 0
-    const causa = causaDe(p, seteo)
+    const der = derivarP0(p, seteo, gates)
+    const causa = der?.causa ?? null
     const motivo = motivos[i] ?? null
     const duenoExacto = motivo !== null ? DUENO_DE_MOTIVO[norm(motivo)] : undefined
     let dueno: PiezaP0['dueno']
@@ -132,7 +138,7 @@ export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly
     } else {
       dueno = causa === 'tenia-gate' ? 'mantencion' : 'seteo'
     }
-    const pieza: PiezaP0 = { ts: p.ts, cantidad: p.cantidad, kg, dueno, motivo, exacto, causa }
+    const pieza: PiezaP0 = { ts: p.ts, cantidad: p.cantidad, kg, dueno, motivo, exacto, causa, calidad: p.calidad, calibres: der?.calibres ?? [], gatesCalibre: der?.gatesCalibre ?? {} }
     out.porPieza.push(pieza)
     out.pz += p.cantidad
     out.kg += kg
@@ -181,11 +187,9 @@ export function duenoDelTramo(porPieza: readonly PiezaP0[], t0Ms: number, desdeM
   return { dueno: mant * 2 > total ? 'mantencion' : 'seteo', mant, total, estimado: estimadoPz > 0 }
 }
 
-/**
- * Precisión del estimado sin Puerta 0: de las piezas que caen en «tenía gate», el 74 % es de verdad fotocélula o puerta
- * (402 de 543, 7 turnos del 16 al 19-11-2026, cruzadas con Puerta 0). Las de los otros grupos son 100 % «Fuera de límites».
- */
-export const PRECISION_ESTIMADO_PCT = 74
+// 23-11: se quitó `PRECISION_ESTIMADO_PCT = 74`. Se había medido para fotocélula + puerta juntas (402 de 543 piezas
+// «tenía gate», 7 turnos del 16 al 19-11); con la puerta en Seteo ya no vale, y solo 4 de esos turnos traen puerta
+// (41 piezas). Mientras no se vuelva a medir, el estimado se rotula «estimado» sin porcentaje.
 
 export const RAFAGA_VENTANA_MS = 15 * 60_000
 /** Piezas de Mantención en la ventana para decir que hay ráfaga. Umbral ilustrativo, a validar en terreno. */
@@ -196,15 +200,13 @@ export interface RafagaP0 {
   hastaMs: number
   pz: number
   kg: number
-  /** Piezas de la ráfaga con motivo «Puerta no preparada» (exacto). */
-  puerta: number
-  /** Alguna pieza de la ráfaga no tiene motivo exacto. */
+  /** Alguna pieza de la ráfaga no tiene motivo exacto (puede traer piezas de puerta: sin Puerta 0 no se separan). */
   estimado: boolean
 }
 
 /**
- * Ráfaga de Mantención: ≥ `umbral` piezas de fotocélula o puerta en una ventana de 15 min. Si hay varias, la que
- * termina más tarde. `null` si no hay ninguna.
+ * Ráfaga de Mantención: ≥ `umbral` piezas de fotocélula (o «tenía gate» estimado) en una ventana de 15 min. Si hay
+ * varias, la que termina más tarde. `null` si no hay ninguna.
  */
 export function rafagaFotocelula(porPieza: readonly PiezaP0[], umbral = RAFAGA_UMBRAL_PZ, ventanaMs = RAFAGA_VENTANA_MS): RafagaP0 | null {
   const mant = porPieza
@@ -227,7 +229,6 @@ export function rafagaFotocelula(porPieza: readonly PiezaP0[], umbral = RAFAGA_U
         hastaMs: mant[j]!.t,
         pz: suma,
         kg: v.reduce((s, p) => s + p.kg, 0),
-        puerta: v.filter((p) => p.motivo !== null && norm(p.motivo) === 'puerta no preparada').reduce((s, p) => s + p.cantidad, 0),
         estimado: v.some((p) => !p.exacto),
       }
     }
@@ -254,8 +255,8 @@ const ROTULO_ESTIMADO: Partial<Record<CausaP0, string>> = {
  */
 export function desgloseP0(r: ResumenP0): { mantencion: LineaDesglose[]; seteo: LineaDesglose[] } {
   const orden: Record<'mantencion' | 'seteo', string[]> = {
-    mantencion: ['No leído por fotocélula', 'Puerta no preparada', ROTULO_ESTIMADO['tenia-gate']!],
-    seteo: ['Fuera de límites', ROTULO_ESTIMADO['calidad-sin-gate']!, ROTULO_ESTIMADO['sin-gate-peso']!, ROTULO_ESTIMADO['calidad-d']!],
+    mantencion: ['No leído por fotocélula', ROTULO_ESTIMADO['tenia-gate']!],
+    seteo: ['Fuera de límites', 'Puerta no preparada', ROTULO_ESTIMADO['calidad-sin-gate']!, ROTULO_ESTIMADO['sin-gate-peso']!, ROTULO_ESTIMADO['calidad-d']!],
   }
   const cuenta = { mantencion: new Map<string, number>(), seteo: new Map<string, number>() }
   for (const p of r.porPieza) {

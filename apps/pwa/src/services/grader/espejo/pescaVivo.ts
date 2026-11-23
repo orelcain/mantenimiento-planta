@@ -82,10 +82,42 @@ export class SeteoInferido {
   }
 }
 
+/** Lo que se deriva de una pieza de Gate 0 con el seteo inferido (lo usan las causas, el árbol y las acciones). */
+export interface DerivadoP0 {
+  causa: CausaP0
+  /** Calibres en que cabe por peso (dos en la zona 4.585–4.995 g; ninguno bajo 900 g). */
+  calibres: string[]
+  /** Gates que en ese momento tenían alguno de esos calibres (cualquier calidad), por calibre. */
+  gatesCalibre: Record<string, number[]>
+}
+
 /**
- * Causa derivada de cada pieza de Gate 0 con el seteo inferido, por su peso y su calidad (Gate 0 trae siempre
- * CONGELADO · DESTINO FILETE: conservación y producto no se pueden derivar). En orden: sin gate para su peso →
- * calidad D → calidad sin gate → tenía gate (la causa física llega con Puerta 0).
+ * Causa derivada de una pieza de Gate 0, por su peso y su calidad. En orden: sin gate para su peso → calidad D →
+ * calidad sin gate → tenía gate (la causa física llega con Puerta 0). `null` sin peso.
+ */
+export function derivarP0(z: PiezaEspejo, seteo: SeteoInferido, gates = seteo.gates()): DerivadoP0 | null {
+  const w = gramos(z)
+  if (!(w > 10)) return null
+  const t = ms(z)
+  const cals = Object.entries(RANGO_CALIBRE_G).filter(([, [a, b]]) => w >= a && w < b).map(([c]) => c)
+  const conCal: Array<{ gate: number; p: Etiqueta }> = []
+  for (const g of gates) {
+    const p = seteo.programa(g, t)
+    if (p && cals.includes(p.calibre)) conCal.push({ gate: g, p })
+  }
+  const gatesCalibre: Record<string, number[]> = {}
+  for (const x of conCal) (gatesCalibre[x.p.calibre] ??= []).push(x.gate)
+  const causa: CausaP0 = conCal.length === 0
+    ? 'sin-gate-peso'
+    : conCal.some((x) => x.p.calidad === z.calidad)
+      ? 'tenia-gate'
+      : z.calidad === 'D' ? 'calidad-d' : 'calidad-sin-gate'
+  return { causa, calibres: cals, gatesCalibre }
+}
+
+/**
+ * Causas derivadas de las piezas de Gate 0 con el seteo inferido (Gate 0 trae siempre CONGELADO · DESTINO FILETE:
+ * conservación y producto no se pueden derivar). Ver `derivarP0`.
  */
 export function causasP0Vivo(piezas: readonly PiezaEspejo[], seteo = new SeteoInferido(piezas)): CausasP0 {
   const out: CausasP0 = {
@@ -100,23 +132,16 @@ export function causasP0Vivo(piezas: readonly PiezaEspejo[], seteo = new SeteoIn
   for (const z of piezas) {
     if (z.gate !== 0) continue
     out.total += z.cantidad
-    const w = gramos(z)
-    if (!(w > 10)) { out.sinPeso += z.cantidad; continue }
-    const t = ms(z)
-    const progs = gates.map((g) => seteo.programa(g, t)).filter((p): p is Etiqueta => p !== null)
-    const cals = Object.entries(RANGO_CALIBRE_G).filter(([, [a, b]]) => w >= a && w < b).map(([c]) => c)
-    const conCal = progs.filter((p) => cals.includes(p.calibre))
-    if (conCal.length === 0) {
-      out.causas['sin-gate-peso'] += z.cantidad
-      if (cals.length === 0) out.pesoBajo += z.cantidad
-      else { const k = cals.join(' / '); out.pesoSinGate[k] = (out.pesoSinGate[k] ?? 0) + z.cantidad }
-      continue
+    const d = derivarP0(z, seteo, gates)
+    if (!d) { out.sinPeso += z.cantidad; continue }
+    out.causas[d.causa] += z.cantidad
+    if (d.causa === 'sin-gate-peso') {
+      if (d.calibres.length === 0) out.pesoBajo += z.cantidad
+      else { const k = d.calibres.join(' / '); out.pesoSinGate[k] = (out.pesoSinGate[k] ?? 0) + z.cantidad }
+    } else if (d.causa === 'calidad-sin-gate') {
+      const k = `${d.calibres.join(' / ')} ${z.calidad}`
+      out.calidadSinGate[k] = (out.calidadSinGate[k] ?? 0) + z.cantidad
     }
-    if (conCal.some((p) => p.calidad === z.calidad)) { out.causas['tenia-gate'] += z.cantidad; continue }
-    if (z.calidad === 'D') { out.causas['calidad-d'] += z.cantidad; continue }
-    out.causas['calidad-sin-gate'] += z.cantidad
-    const k = `${cals.join(' / ')} ${z.calidad}`
-    out.calidadSinGate[k] = (out.calidadSinGate[k] ?? 0) + z.cantidad
   }
   return out
 }
@@ -126,10 +151,32 @@ export function causasP0Vivo(piezas: readonly PiezaEspejo[], seteo = new SeteoIn
 export interface PerfilPesca {
   piezas: number
   calibreDominante: { calibre: string; pct: number } | null
-  /** % por calibre de la salida (sin Gate 0, con peso). */
+  /** % por calibre de la salida (sin Gate 0, con peso), según la etiqueta de Matrix (el programa de la gate). */
   calibrePct: Record<string, number>
+  /** % por calibre según el PESO de cada pieza (cada 2 lb): lo que trae el pescado, sin importar el seteo. */
+  calibrePesoPct: Record<string, number>
+  /** El calibre por peso con más piezas. */
+  dominantePeso: { calibre: string; pct: number } | null
+  /** % por calidad de la salida. */
+  calidadPct: Record<string, number>
   premiumPct: number | null
   pesoMedioKg: number | null
+  /** kg de la salida (sin Gate 0). */
+  kg: number
+}
+
+/**
+ * Calibres nominales por peso, cada 2 lb (los rótulos de Matrix). Distinto de `RANGO_CALIBRE_G`, que son los rangos
+ * PROGRAMADOS de las gates (se solapan en 4.585–4.995 g y sirven para saber si una pieza tenía gate): aquí se
+ * describe el pescado del lote, sin solape, como el mockup v4.
+ */
+export const CALIBRES_LB = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', '12-UP lb'] as const
+const G_POR_LB = 453.592
+
+/** Calibre nominal por el peso de UNA pieza (g): 2 lb por tramo; 12 lb o más → «12-UP lb». */
+export function calibrePorPeso(g: number): string {
+  const i = Math.min(CALIBRES_LB.length - 1, Math.max(0, Math.floor(g / G_POR_LB / 2)))
+  return CALIBRES_LB[i]!
 }
 
 /** Perfil de la salida (gate > 0, con peso) de un grupo de piezas. */
@@ -138,20 +185,37 @@ export function perfil(piezas: readonly PiezaEspejo[]): PerfilPesca {
   let prem = 0
   let kg = 0
   const cal: Record<string, number> = {}
+  const calPeso: Record<string, number> = {}
+  const cali: Record<string, number> = {}
   for (const p of piezas) {
-    if (p.gate <= 0 || !(gramos(p) > 10)) continue
+    const g = gramos(p)
+    if (p.gate <= 0 || !(g > 10)) continue
     n += p.cantidad
     kg += (p.pesoKg ?? 0)
     if (p.calidad === 'Premium') prem += p.cantidad
     cal[p.calibre] = (cal[p.calibre] ?? 0) + p.cantidad
+    const cp = calibrePorPeso(g)
+    calPeso[cp] = (calPeso[cp] ?? 0) + p.cantidad
+    cali[p.calidad] = (cali[p.calidad] ?? 0) + p.cantidad
   }
-  const calibrePct: Record<string, number> = {}
+  const pcts = (o: Record<string, number>): Record<string, number> => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, (v / n) * 100]))
+  const calibrePct = pcts(cal)
   let dom: PerfilPesca['calibreDominante'] = null
-  for (const [k, v] of Object.entries(cal)) {
-    calibrePct[k] = (v / n) * 100
-    if (!dom || calibrePct[k]! > dom.pct) dom = { calibre: k, pct: calibrePct[k]! }
+  for (const [k, v] of Object.entries(calibrePct)) if (!dom || v > dom.pct) dom = { calibre: k, pct: v }
+  const calibrePesoPct = pcts(calPeso)
+  let domPeso: PerfilPesca['dominantePeso'] = null
+  for (const [k, v] of Object.entries(calibrePesoPct)) if (!domPeso || v > domPeso.pct) domPeso = { calibre: k, pct: v }
+  return {
+    piezas: n,
+    calibreDominante: dom,
+    calibrePct,
+    calibrePesoPct,
+    dominantePeso: domPeso,
+    calidadPct: pcts(cali),
+    premiumPct: n > 0 ? (prem / n) * 100 : null,
+    pesoMedioKg: n > 0 ? kg / n : null,
+    kg,
   }
-  return { piezas: n, calibreDominante: dom, calibrePct, premiumPct: n > 0 ? (prem / n) * 100 : null, pesoMedioKg: n > 0 ? kg / n : null }
 }
 
 export interface LoteVivo {
@@ -167,36 +231,47 @@ export interface LoteVivo {
 /** Piezas por lote mínimas para dar por empezado un lote (una pieza suelta de otro lote no es un cambio). */
 export const LOTE_MIN_PIEZAS = 30
 
-/**
- * Lote en curso: el de la última pieza, desde que corre sin otro lote con ≥ 30 piezas en medio, y el anterior.
- */
-export function loteVivo(piezas: readonly PiezaEspejo[]): LoteVivo | null {
-  if (piezas.length === 0) return null
-  // Tramos seguidos por lote.
+/** Un lote del turno: tramo seguido del mismo lote (los tramos de < 30 piezas se unen al vecino). */
+export interface LoteTramo {
+  lote: string
+  /** Hora ISO de la primera y de la última pieza del lote. */
+  desdeTs: string
+  hastaTs: string
+  /** Todas las piezas del lote, Gate 0 incluido. */
+  piezas: number
+  perfil: PerfilPesca
+}
+
+/** Los lotes del turno, en orden. Un lote empieza de verdad con ≥ 30 piezas seguidas. */
+export function lotesDelTurno(piezas: readonly PiezaEspejo[]): LoteTramo[] {
   const tramos: Array<{ lote: string; desde: number; hasta: number; n: number }> = []
   for (let i = 0; i < piezas.length; i++) {
     const p = piezas[i]!
     const u = tramos[tramos.length - 1]
     if (u && u.lote === p.lote) { u.hasta = i; u.n += p.cantidad } else tramos.push({ lote: p.lote, desde: i, hasta: i, n: p.cantidad })
   }
-  // Une los tramos chicos al vecino: un lote empieza de verdad con ≥ 30 piezas seguidas.
+  // Une los tramos chicos al vecino.
   const firmes: typeof tramos = []
   for (const t of tramos) {
     const u = firmes[firmes.length - 1]
     if (u && (t.n < LOTE_MIN_PIEZAS || t.lote === u.lote)) { u.hasta = t.hasta; if (t.lote === u.lote) u.n += t.n; continue }
     firmes.push({ ...t })
   }
-  const actual = firmes[firmes.length - 1]!
-  const ant = firmes.length > 1 ? firmes[firmes.length - 2]! : null
-  const del = (t: { desde: number; hasta: number; lote: string }) => piezas.slice(t.desde, t.hasta + 1).filter((p) => p.lote === t.lote)
-  const pa = del(actual)
-  return {
-    lote: actual.lote,
-    desdeTs: piezas[actual.desde]!.ts,
-    piezas: pa.reduce((s, p) => s + p.cantidad, 0),
-    perfil: perfil(pa),
-    anterior: ant ? { lote: ant.lote, perfil: perfil(del(ant)) } : null,
-  }
+  return firmes.map((t) => {
+    const del = piezas.slice(t.desde, t.hasta + 1).filter((p) => p.lote === t.lote)
+    return { lote: t.lote, desdeTs: piezas[t.desde]!.ts, hastaTs: piezas[t.hasta]!.ts, piezas: del.reduce((s, p) => s + p.cantidad, 0), perfil: perfil(del) }
+  })
+}
+
+/**
+ * Lote en curso: el de la última pieza, desde que corre sin otro lote con ≥ 30 piezas en medio, y el anterior.
+ */
+export function loteVivo(piezas: readonly PiezaEspejo[]): LoteVivo | null {
+  if (piezas.length === 0) return null
+  const l = lotesDelTurno(piezas)
+  const actual = l[l.length - 1]!
+  const ant = l.length > 1 ? l[l.length - 2]! : null
+  return { lote: actual.lote, desdeTs: actual.desdeTs, piezas: actual.piezas, perfil: actual.perfil, anterior: ant ? { lote: ant.lote, perfil: ant.perfil } : null }
 }
 
 /** Distribución de peso de la salida en tramos de 250 g desde 1 kg (% de las piezas), y su media. */
