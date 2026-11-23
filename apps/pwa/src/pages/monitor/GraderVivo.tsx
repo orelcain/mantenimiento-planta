@@ -223,10 +223,10 @@ function HistPeso({ p }: { p: Pesca }) {
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
 export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
-  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto, baaderCada5 } = props
+  const { publico = false, cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto, baaderCada5 } = props
   const d = useMemo(
-    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto }),
-    [cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
+    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto }),
+    [cubetas, inicioMs, finMs, baader, baaderCada5, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, gate0Exacto],
   )
   const [hoja, setHoja] = useState<HojaP0>(null)
   const [loteAbierto, setLoteAbierto] = useState<number | null>(null)

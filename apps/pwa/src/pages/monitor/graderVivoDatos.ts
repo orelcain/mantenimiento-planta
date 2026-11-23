@@ -23,16 +23,12 @@ import {
   bordesPorGate,
   causasP0Vivo,
   escalones,
-  filaDelTurno,
   histogramaPeso,
   loteVivo,
   lotesDelTurno,
   ultimosMinutos,
-  ultimosTurnos,
   zonaCompartida,
-  type FilaTurno,
 } from '@/services/grader/espejo/pescaVivo'
-import type { GraderDailySummary } from '@/services/grader/types'
 import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
 import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
@@ -54,7 +50,7 @@ const kg2 = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.'
  * Agregados que necesitan las piezas una a una (etapas 2, 5 y 1): causas P0, lote, distribución de peso, zona
  * compartida y los turnos anteriores. `null` sin piezas del turno.
  */
-export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, resumenes: readonly GraderDailySummary[] | null, turnoActualId: string | null, leidoHastaMs: number | null = null, gate0Exacto: readonly StoredGate0Record[] | null = null) {
+export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, leidoHastaMs: number | null = null, gate0Exacto: readonly StoredGate0Record[] | null = null) {
   const ini = new Date(inicioMs).toISOString()
   const fin = new Date(finMs).toISOString()
   const pz = piezas.filter((p) => p.ts >= ini && p.ts < fin)
@@ -115,10 +111,6 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
       detalle: `De ${hm(rafaga.desdeMs)} a ${hm(rafaga.hastaMs)} · ${milesPunto(Math.round(rafaga.kg))} kg a P0. Revisar el lente de la fotocélula.`,
     })
   }
-  const filas: FilaTurno[] = [
-    filaDelTurno(pz, `Hoy hasta ${pz[pz.length - 1]!.ts.slice(11, 16)}`),
-    ...(resumenes && turnoActualId ? ultimosTurnos(resumenes, turnoActualId) : []),
-  ]
   return {
     p0Dueno,
     // «Por qué va a P0»: la raíz es la Puerta 0 del turno (sin las piezas de prueba de antes del inicio).
@@ -137,7 +129,6 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
     zonaTurno: zonaCompartida(pz),
     bordes: bordesPorGate(hora),
     seteo,
-    filas,
     avisos,
   }
 }
@@ -170,8 +161,6 @@ export interface EntradaGraderVivo {
   /** Piezas del espejo (la ventana del turno con su margen), para las causas P0, el lote y la zona compartida. */
   piezas?: readonly PiezaEspejo[]
   /** Resúmenes de cierre de los días anteriores y el id del turno actual (`{dateKey}__{turno}`), para comparar. */
-  resumenes?: readonly GraderDailySummary[] | null
-  turnoActualId?: string | null
   /** Registros de Puerta 0 del turno (`loadGate0Records`): motivo exacto por pieza. `null` sin registros. */
   gate0Exacto?: readonly StoredGate0Record[] | null
 }
@@ -190,7 +179,7 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
   // cambia), y de nuevo con el medido sin esos minutos (18-11 T1: con el hueco adentro la correlación bajaba a 0,76; sin él, 0,90).
   const retraso = retrasoOReferencia(baader, serie.pz, serie.hastaMin, minutosSinLectura(serie.pz, baader, RETRASO_REFERENCIA_MIN, cerrados))
   const sinLectura = minutosSinLectura(serie.pz, baader, retraso.min, cerrados)
-  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null, e.leidoHastaMs ?? null, e.gate0Exacto ?? null) : null
+  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.leidoHastaMs ?? null, e.gate0Exacto ?? null) : null
   const mantMin = pesca ? mantPorMinuto(pesca.p0Dueno.porPieza, serie.t0Ms) : null
   const alertas = evaluarAlertas({
     leidoHastaMin,

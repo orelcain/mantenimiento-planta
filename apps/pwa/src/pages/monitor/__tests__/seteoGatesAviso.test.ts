@@ -7,7 +7,7 @@ const d = turnoReal('2026-11-19-turno_2')
 const fin = d.t0Ms + 8 * 60 * 60_000
 const a = (h: string) => {
   const ms = Date.parse(`2026-11-19T${h}:00Z`)
-  return armarPesca(piezasHasta(d, ms), d.t0Ms, fin, null, null, ms)!
+  return armarPesca(piezasHasta(d, ms), d.t0Ms, fin, ms)!
 }
 
 describe('aviso gate-cambio', () => {

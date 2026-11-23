@@ -13,10 +13,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import urlPiezas from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-turno_1.json.gz?url'
 import extra from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-turno_1-extra.json'
-import resumenes from '@/services/grader/espejo/__fixtures__/chonchi-resumenes-16-al-18-11.json'
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
 import { serieDesdeCada5, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
-import type { CalibreRange, GraderDailySummary } from '@/services/grader/types'
+import type { CalibreRange } from '@/services/grader/types'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import '@/pages/monitor/monitorGlass.css'
 import { cubetasDe } from '@/services/grader/espejo/espejoMinutos'
@@ -155,8 +154,6 @@ export default function GraderVivoDevPage() {
           minutosSinLatido={1}
           turnoEnCurso
           piezas={piezas}
-          resumenes={resumenes as unknown as GraderDailySummary[]}
-          turnoActualId="2026-11-18__Turno 1"
           gate0Exacto={gate0}
           publico={PUBLICO}
         />

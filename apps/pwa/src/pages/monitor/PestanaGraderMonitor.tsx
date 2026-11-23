@@ -35,7 +35,7 @@ import {
   type CadenciaExporte,
   type Tramo,
 } from '@/services/grader/graderCobertura'
-import { useDatosGraderHasta, useResumenesAlrededor, useResumenesPrevios } from '@/services/grader/graderDatosHasta'
+import { useDatosGraderHasta, useResumenesAlrededor } from '@/services/grader/graderDatosHasta'
 
 const CLAVE_CADENCIA = (lineId: string) => `grader-cadencia-exporte:${lineId}`
 
@@ -205,13 +205,10 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
     [dateKey, inicio, fin, turnoId],
   )
   const espejo = useEspejoGrader(lineaDelEspejo(lineId), ventana)
-  // Cierres de los días anteriores, para comparar el turno con los últimos 6 (una lectura por día visto).
-  const previos = useResumenesPrevios(lineId, dateKey)
   const turnoEnCurso = Number.isFinite(ahoraWallMs) && (!ventana || ahoraWallMs < ventana.endMs)
   // Última lectura COMPLETA del lector (sin tramo pendiente, error ni recarga), nunca más allá del fin del rango de
   // Matrix: hasta ahí los minutos sin piezas son de verdad.
   const leidoHastaMs = leidoHastaDelLector(espejo.estado)
-  const turnoActualId = dateKey && turnoId ? `${dateKey}__${turnoId}` : null
   const tramosEspejo = useMemo(
     () => (ventana && !espejo.cargandoPiezas ? tramosDelEspejo(espejo.cubetas, ventana.startMs, ventana.endMs, baader) : SIN_TRAMOS),
     [ventana, espejo.cargandoPiezas, espejo.cubetas, baader],
@@ -254,8 +251,6 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           turnoEnCurso={turnoEnCurso}
           leidoHastaMs={leidoHastaMs}
           piezas={espejo.piezas}
-          resumenes={previos.estado === 'listo' ? previos.valor : null}
-          turnoActualId={turnoActualId}
           gate0Exacto={gate0Exacto}
           publico={!esAdmin}
         />
