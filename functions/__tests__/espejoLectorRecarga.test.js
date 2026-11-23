@@ -45,8 +45,8 @@ function correr(guion) {
   return r.stdout.replace(/\r/g, '').trim().split('\n')
 }
 
-test('el lector es e1.7 y la recarga tiene sus archivos aparte del estado normal', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.7'$/m)
+test('el lector es e1.8 y la recarga tiene sus archivos aparte del estado normal', () => {
+  assert.match(LECTOR, /^\$VERSION = 'e1\.8'$/m)
   assert.ok(LECTOR.includes("$archivoRecarga = Join-Path $dir 'RECARGA'"))
   assert.ok(LECTOR.includes("$archivoRecargaEstado = Join-Path $dir 'recarga.json'"))
   // Los envíos de la recarga avanzan SU ancla, en recarga.json; estado.json no se toca.
