@@ -197,7 +197,16 @@ try {
   }
 } catch { Fallo 'las carpetas del usuario' $_ }
 foreach ($x in $extra) { [void]$carpetas.Add($x) }
-$raices = @($carpetas | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Sort-Object -Unique)
+# Sin repetidas ni carpetas dentro de otra ya incluida (duplican archivos y agotan el tope). La del proceso va primero.
+$validas = @($carpetas | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | ForEach-Object { if ($_.Length -gt 3) { $_.TrimEnd('\\') } else { $_ } })
+$raices = New-Object System.Collections.Generic.List[string]
+foreach ($c in $validas) {
+  $dentro = $false
+  foreach ($o in $validas) { if ($o -ne $c -and $c.StartsWith($o.TrimEnd('\\') + '\\', [StringComparison]::OrdinalIgnoreCase)) { $dentro = $true; break } }
+  $ya = $false
+  foreach ($o in $raices) { if ($o -ieq $c) { $ya = $true; break } }
+  if (-not $dentro -and -not $ya) { $raices.Add($c) }
+}
 F ('Carpetas a revisar: ' + $raices.Count)
 foreach ($r in @($raices | Select-Object -First 10)) { F ('   ' + $r) }
 
@@ -205,6 +214,9 @@ T '6. ARCHIVOS DE CONFIGURACIÓN Y BASES LOCALES (no se abren las bases)'
 $extCfg = @('.config', '.ini', '.xml', '.json', '.udl', '.dsn', '.cfg', '.conf', '.properties', '.settings')
 $extLocal = @('.mdf', '.ldf', '.sdf', '.db', '.sqlite', '.fdb', '.gdb', '.mdb', '.accdb')
 foreach ($r in $raices) { try { Recorre $r } catch { Fallo ('el recorrido de ' + $r) $_ } }
+# Si se llegó a un tope, la lista de archivos está incompleta: el veredicto no puede afirmar que algo «no está».
+$recorridoCortado = ($st.vistos -ge 3000 -or $reloj.Elapsed.TotalSeconds -ge 25)
+if ($recorridoCortado) { F 'Aviso: el recorrido llegó a su tope (3000 archivos o 25 s); la lista de archivos está incompleta.' }
 $cfgCount = 0; $locales = 0; $mostrados = 0
 foreach ($f in $todos) {
   $ext = $f.Extension.ToLowerInvariant()
@@ -414,9 +426,12 @@ try {
 } catch { Fallo 'el protector de pantalla y las políticas' $_ }
 
 T '11. CÓMO HABLA MATRIX CON SU SERVIDOR (solo se listan archivos y conexiones ya abiertas; nada se abre ni se conecta)'
-$drivers = New-Object System.Collections.Generic.List[string]
+$fuertes = New-Object System.Collections.Generic.List[string]
+$posibles = New-Object System.Collections.Generic.List[string]
+$evidencia = New-Object System.Collections.Generic.List[string]
 $remotos = New-Object System.Collections.Generic.List[string]
 $dllVistas = 0
+$memoriaRevisada = $false
 $patronSqlDll = '(?i)^(qsql\\w*|Qt\\d*Sql\\w*|libpq|libmysql|libmariadb|fbclient|gds32|sqlite3|sqlncli\\w*|msodbcsql\\w*|ntwdblib|dbodbc\\w*|dblib\\w*|oci|oraociei\\w*)\\.dll$'
 $patronRedDll = '(?i)^(Qt\\d*Network|Qt\\d*WebSockets|Qt\\d*RemoteObjects|Qt\\d*Mqtt|Qt\\d*SerialPort|grpc\\w*|libprotobuf\\w*|libzmq\\w*)\\.dll$'
 # Motor al que apunta una biblioteca. SQLite es un archivo local: no sirve para leer el servidor.
@@ -430,14 +445,41 @@ function MotorDll([string]$n) {
   if ($n -match '(?i)dbodbc|dblib') { return 'SQL Anywhere' }
   return 'módulo SQL de Qt (sin driver propio)'
 }
+# Un plugin qsql* suelto NO prueba nada: Qt suele copiar varios aunque el programa no los use.
+# Evidencia fuerte: biblioteca cliente del motor en la carpeta, driver cargado en memoria o conexión a un puerto de base.
+function Anota-Sql([string]$nombre, [string]$donde) {
+  $md = MotorDll $nombre
+  if ($md -match 'SQLite|módulo SQL') { return $md }
+  if ($donde -eq 'memoria') { [void]$fuertes.Add($md); [void]$evidencia.Add($nombre + ' cargada en memoria') }
+  elseif ($nombre -match '(?i)^qsql') { [void]$posibles.Add($md) }
+  else { [void]$fuertes.Add($md); [void]$evidencia.Add($nombre + ' en la carpeta de Matrix') }
+  return $md
+}
+# Nombres de los módulos cargados. Un proceso de 32 bits visto desde PowerShell de 64 bits entrega una lista
+# incompleta sin dar error: se reconoce porque falta kernel32.dll, y entonces se pregunta al PowerShell de 32 bits.
+function ModulosDe($p) {
+  $nombres = @()
+  try { $nombres = @($p.Modules | ForEach-Object { [string]$_.ModuleName }) } catch { }
+  $completa = ($nombres.Count -ge 8 -and @($nombres | Where-Object { $_ -match '(?i)^kernel32\\.dll$' }).Count -gt 0)
+  if (-not $completa -and [Environment]::Is64BitProcess) {
+    $ps32 = Join-Path $env:WINDIR 'SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe'
+    if (Test-Path -LiteralPath $ps32) {
+      try {
+        $orden = '(Get-Process -Id {0}).Modules | ForEach-Object {{ $_.ModuleName }}' -f [int]$p.Id
+        $n32 = @(& $ps32 -NoProfile -NonInteractive -Command $orden 2>$null | ForEach-Object { [string]$_ })
+        if ($n32.Count -ge 8 -and @($n32 | Where-Object { $_ -match '(?i)^kernel32\\.dll$' }).Count -gt 0) { $nombres = $n32; $completa = $true }
+      } catch { }
+    }
+  }
+  return [pscustomobject]@{ Completa = $completa; Nombres = $nombres }
+}
 try {
   foreach ($f in $todos) {
     if ($f.Extension.ToLowerInvariant() -ne '.dll') { continue }
     $dllVistas++
     if ($f.Name -match $patronSqlDll) {
-      $md = MotorDll $f.Name
+      $md = Anota-Sql $f.Name 'carpeta'
       F ("biblioteca SQL: {0} | carpeta: {1} | {2}" -f $f.Name, (Recorta (Split-Path -Leaf $f.DirectoryName) 40), $md)
-      [void]$drivers.Add($md)
     } elseif ($f.Name -match $patronRedDll) {
       F ("biblioteca de red: {0}" -f $f.Name)
     } elseif ($f.Name -match '(?i)^Qt\\d*Core\\.dll$') {
@@ -447,7 +489,7 @@ try {
   }
   F ('Bibliotecas (.dll) vistas en las carpetas de Matrix: ' + $dllVistas)
   if ($dllVistas -eq 0) { F 'No se vio ninguna: falta pasar la carpeta de Matrix.exe (variable SONDEO_CARPETAS).' }
-  elseif ($drivers.Count -eq 0) { F 'Ninguna biblioteca SQL entre ellas.' }
+  elseif ($fuertes.Count -eq 0 -and $posibles.Count -eq 0) { F 'Ninguna biblioteca SQL de servidor entre ellas.' }
 } catch { Fallo 'las bibliotecas de Matrix' $_ }
 $puertoDe = @{ 1433 = 'SQL Server'; 5432 = 'PostgreSQL'; 3306 = 'MySQL/MariaDB'; 3050 = 'Firebird'; 2638 = 'SQL Anywhere'; 1521 = 'Oracle' }
 $pidsMx = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'matrix|marelec' } | ForEach-Object { [int]$_.Id })
@@ -468,20 +510,20 @@ else {
       $que = if ($puertoDe.ContainsKey($pto)) { 'puerto habitual de ' + $puertoDe[$pto] } else { 'no es el puerto habitual de ningún motor de base' }
       F ("conexión abierta de Matrix -> {0} ({1})" -f $par, $que)
       [void]$remotos.Add($par)
-      if ($puertoDe.ContainsKey($pto)) { [void]$drivers.Add([string]$puertoDe[$pto]) }
+      if ($puertoDe.ContainsKey($pto)) { [void]$fuertes.Add([string]$puertoDe[$pto]); [void]$evidencia.Add('conexión abierta a ' + $par) }
     }
     if ($remotos.Count -eq 0) { F 'Matrix no tiene conexiones abiertas hacia otro equipo.' }
   } catch { Fallo 'las conexiones de Matrix' $_ }
   foreach ($p in @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'matrix|marelec' })) {
-    try {
-      $mods = @($p.Modules | ForEach-Object { [string]$_.ModuleName } | Where-Object { $_ -match $patronSqlDll })
-      if ($mods.Count -eq 0) { F ("{0}: sin bibliotecas SQL cargadas en memoria." -f $p.ProcessName) }
-      foreach ($mn in @($mods | Sort-Object -Unique)) {
-        $md = MotorDll $mn
-        F ("{0}: cargada en memoria {1} | {2}" -f $p.ProcessName, $mn, $md)
-        [void]$drivers.Add($md)
-      }
-    } catch { F ("{0}: no se pudieron listar los módulos cargados (proceso de 32 bits o sin permiso)." -f $p.ProcessName) }
+    $mm = ModulosDe $p
+    if (-not $mm.Completa) { F ("{0}: no se pudo listar los módulos cargados ({1} vistos, lista incompleta). La evidencia en memoria queda sin revisar." -f $p.ProcessName, @($mm.Nombres).Count); continue }
+    $memoriaRevisada = $true
+    $mods = @($mm.Nombres | Where-Object { $_ -match $patronSqlDll } | Sort-Object -Unique)
+    if ($mods.Count -eq 0) { F ("{0}: {1} módulos cargados; ninguna biblioteca SQL entre ellos." -f $p.ProcessName, @($mm.Nombres).Count) }
+    foreach ($mn in $mods) {
+      $md = Anota-Sql $mn 'memoria'
+      F ("{0}: cargada en memoria {1} | {2}" -f $p.ProcessName, $mn, $md)
+    }
   }
 }
 
@@ -522,7 +564,7 @@ try {
 } catch { Fallo 'el registro de Marelec y Matrix' $_ }
 
 T '13. VEREDICTO'
-$drvSrv = @(@($drivers) | Where-Object { $_ -notmatch 'SQLite|módulo SQL' } | Sort-Object -Unique)
+$drvSrv = @(@($fuertes) | Sort-Object -Unique)
 $mot = @(@($V.motores) + $drvSrv | Select-Object -Unique)
 $srv = @(@($V.servidores) + @($V.instancias) | Select-Object -Unique)
 $bas = @(@($V.bases) | Select-Object -Unique)
@@ -530,9 +572,18 @@ if ($mot.Count -eq 0) { F 'Motor: no identificado.' } else { F ('Motor probable:
 F ('Servidor o instancia: ' + $(if ($srv.Count) { $srv -join ', ' } else { 'no encontrado en las carpetas revisadas' }))
 F ('Base: ' + $(if ($bas.Count) { $bas -join ', ' } else { 'no encontrada en las configuraciones revisadas' }))
 if ($remotos.Count) { F ('Matrix habla con: ' + (@($remotos | Sort-Object -Unique) -join ', ') + '.') }
-if ($dllVistas -eq 0) { F 'Vía de lectura: sin decidir. No se vieron las bibliotecas de Matrix (pasar la carpeta de Matrix.exe en SONDEO_CARPETAS).' }
-elseif ($drvSrv.Count) { F ('Vía de lectura: Matrix trae driver SQL de servidor (' + ($drvSrv -join ', ') + '). Se puede leer la base desde este PC, sin pantalla, con un usuario de SOLO LECTURA que entregue TI o Marelec.') }
-else { F 'Vía de lectura: Matrix no trae driver SQL de servidor: habla con Matrix CS por un protocolo propio. La base solo se puede leer en el servidor; hay que pedirlo a TI o a Marelec.' }
+$psb = @(@($posibles) | Sort-Object -Unique)
+if ($drvSrv.Count) { F ('Vía de lectura: Matrix habla SQL con su servidor (' + ($drvSrv -join ', ') + '). Evidencia: ' + (@($evidencia | Sort-Object -Unique) -join '; ') + '. Se puede leer la base desde este PC, sin pantalla, con un usuario de SOLO LECTURA que entregue TI o Marelec.') }
+elseif ($dllVistas -eq 0) { F 'Vía de lectura: sin decidir. No se vieron las bibliotecas de Matrix (pasar la carpeta de Matrix.exe en SONDEO_CARPETAS).' }
+elseif ($recorridoCortado) { F 'Vía de lectura: sin decidir. El recorrido de archivos quedó incompleto (tope); pasar solo la carpeta de Matrix.exe en SONDEO_CARPETAS y repetir.' }
+elseif ($psb.Count) {
+  $cola = if ($memoriaRevisada) { 'Con Matrix abierto no estaba cargado: lo más probable es un protocolo propio; repetir con un informe en pantalla para confirmarlo.' } else { 'Falta verlo en uso: repetir con Matrix abierto y un informe en pantalla.' }
+  F ('Vía de lectura: posible, sin confirmar. Matrix trae el plugin SQL de ' + ($psb -join ', ') + ', pero no se vio en uso (ni cargado en memoria ni conexión a un puerto de base). ' + $cola)
+}
+else {
+  $cola = if ($memoriaRevisada) { '' } else { ' Repetir con Matrix abierto para confirmarlo en memoria.' }
+  F ('Vía de lectura: Matrix no trae driver SQL de servidor: habla con Matrix CS por un protocolo propio. La base solo se puede leer en el servidor; hay que pedirlo a TI o a Marelec.' + $cola)
+}
 if ($V.procesos.Count) { F 'Matrix estaba abierto: el sondeo no lo tocó.' }
 $falta = New-Object System.Collections.Generic.List[string]
 if ($srv.Count -eq 0) { $falta.Add('la cadena de conexión: pasar la carpeta donde está Matrix.exe (variable SONDEO_CARPETAS)') }
