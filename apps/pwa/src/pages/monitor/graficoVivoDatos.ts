@@ -13,6 +13,7 @@ import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/g
 import { coma1, horaDelEje, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import type { PiezaP0 } from '@/services/grader/espejo/motivoP0'
 import type { DatosGraderVivo } from './graderVivoDatos'
+import { franjaLotes, loteCorto, loteDelMinuto, rotuloFranja, type FranjaLote } from './lotesTurnoDatos'
 
 /** Lo más que se acerca el zoom: 5 minutos a la vista. */
 export const ZOOM_MIN_MIN = 5
@@ -216,6 +217,12 @@ export interface DatosGrafico {
   barras: Record<ModoP0, BarraP0[]>
   /** Sin ninguna pieza de Gate 0 en el turno: el panel de P0 lo dice en vez de dibujar 0. */
   sinP0: boolean
+  /** Franja de lotes sobre el panel de arriba (tocar abre la ficha del lote). */
+  lotes: FranjaLote[]
+  /** Tramos de entrada manual estimada [desde, hasta, ≈pz] (franja «Manual (estimado)»); `[]` sin ellos. */
+  manual: Array<[number, number, number]>
+  /** Las Baader vienen cada 5 min (respaldo de Shoplogix), no por minuto. */
+  baader5: boolean
 }
 
 export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
@@ -245,6 +252,9 @@ export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
     mantMin: mantPorMin(porPieza, d.serie.t0Ms),
     barras: { '15': barrasP0(d, porPieza, '15'), min: barrasP0(d, porPieza, 'min') },
     sinP0: d.totales.p0 === null,
+    lotes: franjaLotes(d.lotes),
+    manual: [],
+    baader5: false,
   }
 }
 
@@ -255,6 +265,9 @@ export function largoVentana(len: number): string {
   const r = len % 60
   return `${h} h${r ? ` ${String(r).padStart(2, '0')} min` : ''}`
 }
+
+/** Franjas sobre el panel de arriba (px desde el borde del gráfico): lotes y, debajo, la entrada manual estimada. */
+export const FRANJA = { loteY: 2, loteAlto: 16, manualY: 22, manualAlto: 6 } as const
 
 /** Alto (px) de cada panel y márgenes: los usa la opción y el componente (para medir el ancho útil). */
 export const GEOM = { izq: 34, der: 10, arriba: 34, alto1Angosto: 130, alto1: 160, hueco: 34, alto2: 70, slider: 26 } as const
@@ -423,6 +436,35 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
         data: g.grader.map((y, m) => [m + 0.5, y]),
       },
       {
+        id: 'lotes',
+        name: 'Lotes',
+        type: 'custom',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        clip: false,
+        silent: false,
+        cursor: 'pointer',
+        tooltip: { show: false },
+        data: g.lotes.filter((f) => f.x1 > v.a && f.x0 < v.b).map((f) => [f.x0, f.x1, f.k]),
+        encode: { x: [0, 1] },
+        renderItem: (_params: unknown, api: unknown) => {
+          const a = api as { value: (i: number) => number; coord: (p: [number, number]) => [number, number] }
+          // Sobre el panel de arriba (y fijo en px), recortada a la ventana.
+          const x0 = Math.max(a.value(0), v.a)
+          const x1 = Math.min(a.value(1), v.b)
+          const k = a.value(2)
+          const f = g.lotes.find((x) => x.k === k)
+          const px0 = a.coord([x0, 0])[0]
+          const px1 = a.coord([x1, 0])[0]
+          const w = Math.max(2, px1 - px0 - 1)
+          const par = k % 2 === 1
+          const txt = f ? rotuloFranja(f, w) : ''
+          const hijos: unknown[] = [{ type: 'rect', shape: { x: px0, y: FRANJA.loteY, width: w, height: FRANJA.loteAlto, r: 4 }, style: { fill: tema.acento, opacity: par ? 1 : 0.45 } }]
+          if (txt) hijos.push({ type: 'text', style: { x: px0 + 6, y: FRANJA.loteY + FRANJA.loteAlto / 2, text: txt, verticalAlign: 'middle', fill: par ? tema.fondo : tema.texto, font: '600 12px IBM Plex Sans, sans-serif' }, silent: true })
+          return { type: 'group', children: hijos }
+        },
+      } as never,
+      {
         id: 'p0',
         name: modo === '15' ? 'P0 cada 15 min (%)' : 'P0 por minuto (piezas)',
         type: 'custom',
@@ -485,6 +527,7 @@ export function textoMinuto(g: DatosGrafico, m: number): string {
   const bd = g.baader?.[m]
   const total = g.g0[m] ?? 0
   const mant = Math.min(total, g.mantMin?.get(m) ?? 0)
+  const lote = loteDelMinuto(g.lotes, m)
   const avisos: string[] = []
   if (gr === null) avisos.push('sin lectura')
   if (g.detenciones.some(([a, b]) => m >= a && m < b)) avisos.push('detenida')
@@ -493,5 +536,6 @@ export function textoMinuto(g: DatosGrafico, m: number): string {
     + fila('Grader', gr === null || gr === undefined ? '—' : String(gr))
     + fila('Baader', bd === null || bd === undefined ? '—' : String(Math.round(bd)))
     + fila('P0', total > 0 && g.mantMin ? `${total} · ${mant} Mant. · ${total - mant} seteo` : String(total))
+    + (lote ? fila('Lote', loteCorto(lote.lote)) : '')
     + (avisos.length ? `<p style="margin:4px 0 0;opacity:.75">${avisos.join(' · ')}</p>` : '')
 }

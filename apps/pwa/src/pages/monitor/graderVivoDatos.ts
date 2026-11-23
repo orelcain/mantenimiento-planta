@@ -26,6 +26,7 @@ import {
   filaDelTurno,
   histogramaPeso,
   loteVivo,
+  lotesDelTurno,
   ultimosMinutos,
   ultimosTurnos,
   zonaCompartida,
@@ -37,6 +38,8 @@ import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type Resu
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import { hayQueHacer } from './hayQueHacerDatos'
 import { arbolP0 } from './porQueP0Datos'
+import { filasLotes } from './lotesTurnoDatos'
+import { huecos } from './graficoVivoDatos'
 
 /** El aviso de cambio de lote se muestra la primera hora del lote nuevo. */
 export const LOTE_AVISO_MIN = 60
@@ -58,6 +61,7 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
   if (pz.length === 0) return null
   const ultMs = Date.parse(pz[pz.length - 1]!.ts)
   const hora = ultimosMinutos(pz, 60)
+  const lotes = lotesDelTurno(pz)
   const lote = loteVivo(pz)
   const avisos: AlertaGrader[] = []
   const desdeMin = (ts: string) => Math.max(0, Math.floor((Date.parse(ts) - inicioMs) / 60_000))
@@ -69,7 +73,7 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
       nivel: 'atento',
       desdeMin: desdeMin(lote.desdeTs),
       titulo: `${lote.desdeTs.slice(11, 16)} · Cambio de lote: ${lote.anterior.lote} → ${lote.lote}`,
-      detalle: `Peso medio de ${kg2(a.pesoMedioKg)} a ${kg2(b.pesoMedioKg)} kg; ${b.calibreDominante?.calibre ?? '—'} es el ${Math.round(b.calibreDominante?.pct ?? 0)} % del lote nuevo.`,
+      detalle: `Peso medio de ${kg2(a.pesoMedioKg)} a ${kg2(b.pesoMedioKg)} kg; ${b.dominantePeso?.calibre ?? '—'} es el ${Math.round(b.dominantePeso?.pct ?? 0)} % del lote nuevo (por peso).`,
     })
   }
   for (const e of escalones(hora)) {
@@ -124,6 +128,8 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
     hacer: hayQueHacer(p0Dueno, lote, ultMs),
     causas: causasP0Vivo(pz),
     lote,
+    /** Los lotes del turno en orden (tarjeta «Lotes del turno» y franja del gráfico). */
+    lotes,
     hora: { desde: hora[0]?.ts.slice(11, 16) ?? '', hasta: pz[pz.length - 1]!.ts.slice(11, 16) },
     histHora: histogramaPeso(hora),
     histTurno: histogramaPeso(pz),
@@ -203,6 +209,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     retraso,
     alertas: pesca ? [...alertas, ...pesca.avisos].sort((a, b) => (a.nivel === b.nivel ? a.desdeMin - b.desdeMin : a.nivel === 'mal' ? -1 : 1)) : alertas,
     pesca,
+    /** Filas de «Lotes del turno» (con el hueco del espejo entre dos lotes); `[]` sin piezas. */
+    lotes: pesca ? filasLotes(pesca.lotes, serie.t0Ms, huecos(sinLectura, serie.hastaMin), e.turnoEnCurso) : [],
     totales: totalesDelTurno(serie),
     salida: salidaUltimaHora(serie),
     // `mantPz`: piezas de Mantención del tramo (fotocélula + puerta, o «tenía gate» estimado). `null` sin piezas.

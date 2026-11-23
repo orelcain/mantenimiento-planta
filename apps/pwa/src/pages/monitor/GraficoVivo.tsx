@@ -93,7 +93,7 @@ function Segmento({ valor, onCambio }: { valor: FiltroDueno; onCambio: (f: Filtr
   )
 }
 
-export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto }: { d: DatosGraderVivo; onAbrirTramo?: (desdeMin: number) => void; onAbrirMinuto?: (min: number) => void }) {
+export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d: DatosGraderVivo; onAbrirTramo?: (desdeMin: number) => void; onAbrirMinuto?: (min: number) => void; onAbrirLote?: (k: number) => void }) {
   const g = useMemo(() => datosGrafico(d), [d])
   const [ref, tema, ancho] = useTemaYAncho()
   const [filtro, setFiltro] = useState<FiltroDueno>('')
@@ -123,11 +123,13 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto }: { d: DatosGrader
     if (dz && dz.startValue != null && dz.endValue != null) fijar({ a: dz.startValue, b: dz.endValue })
   }, [fijar])
   const onClic = useCallback((p: { seriesId?: string; value?: number[] }) => {
-    if (p.seriesId !== 'p0' || !p.value) return
+    if (!p.value) return
+    if (p.seriesId === 'lotes') { onAbrirLote?.(p.value[2]!); return }
+    if (p.seriesId !== 'p0') return
     const x0 = p.value[0]!
     if (p.value[1]! - x0 > 1) onAbrirTramo?.(x0)
     else onAbrirMinuto?.(x0)
-  }, [onAbrirTramo, onAbrirMinuto])
+  }, [onAbrirTramo, onAbrirMinuto, onAbrirLote])
 
   const angosto = ancho > 0 && ancho < 480
   const alto = GEOM.arriba + (angosto ? GEOM.alto1Angosto : GEOM.alto1) + GEOM.hueco + GEOM.alto2 + 24 + GEOM.slider + 8
@@ -187,6 +189,7 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto }: { d: DatosGrader
           <li>Rueda para acercar y arrastrar para mover; la barra de abajo recorre el turno. En el celular, la barra y los botones.</li>
           <li>«Todo · Mantención · Seteo» resalta el P0 de ese dueño y atenúa el resto.</li>
           <li>Con más de 60 min a la vista, el P0 va en barras de 15 min en % con la raya de 3,5 % (la alerta «P0 alto»). Al acercar, barras por minuto en piezas.</li>
+          <li>Franja de arriba: los lotes del turno; tocar uno abre su ficha y avisa si es distinto del anterior.</li>
           <li>Tramos grises: sin lectura del espejo o menos de 50 piezas. En el celular arranca en la última hora.</li>
         </ul>
       </details>

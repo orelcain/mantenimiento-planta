@@ -8,7 +8,7 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BellRing, Hand, Layers, Package, SplitSquareHorizontal } from 'lucide-react'
+import { BellRing, Hand, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { Tarjeta } from './TarjetaVivo'
@@ -16,17 +16,14 @@ import { CuantoLlevamos } from './CuantoLlevamos'
 import { HayQueHacerAlgo } from './HayQueHacerAlgo'
 import { GraficoVivo } from './GraficoVivo'
 import { HojasP0, PorQueP0, type HojaP0 } from './PorQueP0'
+import { HojaLote, LotesDelTurno } from './LotesDelTurno'
+import { indiceLote } from './lotesTurnoDatos'
 import type { Accion } from './hayQueHacerDatos'
 import { cuentaDelTurno } from './cuantoLlevamosDatos'
 import { armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
 
 type Datos = DatosGraderVivo
-
-/** Lote «720260739» → «720.260.739», como lo muestra Matrix. */
-function loteLegible(l: string): string {
-  return /^\d+$/.test(l) ? milesPunto(Number(l)) : l
-}
 
 function useAncho<T extends HTMLElement>(): [React.RefObject<T>, number] {
   const ref = useRef<T>(null)
@@ -73,17 +70,6 @@ function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   )
 }
 
-function Cifra({ k, v, s, chico }: { k: string; v: string; s: string; chico?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[13px] leading-[18px] text-muted-foreground">{k}</p>
-      <p className={cn('mt-1 font-semibold tracking-tight tabular-nums text-foreground', chico ? 'text-[20px] leading-[32px] lg:leading-[38px]' : 'text-[28px] leading-[32px] lg:text-[32px] lg:leading-[38px]')}>{v}</p>
-      <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{s}</p>
-    </div>
-  )
-}
-
-/** Las barras de la cascada «Dónde se fueron las piezas»: 2,5 de alto sobre `bg-muted`, la cifra a la derecha. */
 function Reparto({ titulo, filas }: { titulo: string; filas: Array<{ clave: string; pct: number }> }) {
   return (
     <div>
@@ -237,30 +223,6 @@ function BordesGate({ p }: { p: Pesca }) {
 }
 
 /** Etapa 5: lote en curso, peso de la última hora contra el turno y los últimos 6 turnos. */
-function LoteYPesca({ p }: { p: Pesca }) {
-  const l = p.lote
-  const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v)} %`)
-  const kg = (v: number | null) => (v === null ? '—' : `${coma1(v)} kg`)
-  return (
-    <Tarjeta titulo={l ? `Lote ${loteLegible(l.lote)}` : 'Lote en curso'} sub={l ? `desde las ${l.desdeTs.slice(11, 16)} · ${milesPunto(l.piezas)} piezas` : undefined} icono={<Package className={IC} />}>
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
-          {l && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-              <Cifra chico k="Calibre dominante" v={l.perfil.calibreDominante?.calibre.replace(' lb', '') ?? '—'} s={pct(l.perfil.calibreDominante?.pct)} />
-              <Cifra chico k="10-12 lb" v={pct(l.perfil.calibrePct['10-12 lb'] ?? 0)} s={l.anterior ? `antes ${pct(l.anterior.perfil.calibrePct['10-12 lb'] ?? 0)}` : 'primer lote'} />
-              <Cifra chico k="Premium" v={l.perfil.premiumPct === null ? '—' : `${coma1(l.perfil.premiumPct)} %`} s={l.anterior?.perfil.premiumPct != null ? `antes ${coma1(l.anterior.perfil.premiumPct)} %` : ''} />
-              <Cifra chico k="Peso medio" v={kg(l.perfil.pesoMedioKg)} s={l.anterior ? `antes ${kg(l.anterior.perfil.pesoMedioKg)}` : ''} />
-            </div>
-          )}
-          <HistPeso p={p} />
-        </div>
-        <TurnosAnteriores filas={p.filas} />
-      </div>
-    </Tarjeta>
-  )
-}
-
 function HistPeso({ p }: { p: Pesca }) {
   const [ref, w] = useAncho<HTMLDivElement>()
   const h = 150
@@ -275,9 +237,8 @@ function HistPeso({ p }: { p: Pesca }) {
   const bw = W / a.length
   const y = (v: number) => mt + H - (H * v) / tope
   return (
-    <div>
-      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Peso, última hora contra el turno (cada 250 g)</p>
-      <div ref={ref} className="w-full">
+    <Tarjeta titulo="Peso" sub="Última hora contra el turno, cada 250 g" icono={<Scale className={IC} />}>
+      <div ref={ref} className="mt-3 w-full">
         {w > 0 && (
           <svg width={w} height={h} role="img" aria-label="Distribución de peso cada 250 g" className="block">
             {[0, tope / 2, tope].map((v) => (
@@ -298,43 +259,7 @@ function HistPeso({ p }: { p: Pesca }) {
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3 rounded-[3px]" style={{ background: 'var(--v2-acento)', opacity: 0.7 }} />Última hora · media {p.histHora.mediaKg === null ? '—' : `${coma1(p.histHora.mediaKg)} kg`}</span>
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: TONO_810 }} />Turno · media {p.histTurno.mediaKg === null ? '—' : `${coma1(p.histTurno.mediaKg)} kg`}</span>
       </div>
-    </div>
-  )
-}
-
-function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
-  const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v)} %`)
-  return (
-    <div className="overflow-x-auto">
-      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Este turno (primera fila) y los 6 anteriores (cierre)</p>
-      <table className="w-full text-[13px] leading-[18px] tabular-nums">
-        <thead>
-          <tr className="text-[12px] text-muted-foreground">
-            <th className="py-1 pr-2 text-left font-normal">Turno</th>
-            <th className="py-1 pr-2 text-right font-normal">pz/h</th>
-            <th className="py-1 pr-2 text-right font-normal">P0</th>
-            <th className="py-1 pr-2 text-right font-normal">kg</th>
-            <th className="py-1 pr-2 text-right font-normal">6-8</th>
-            <th className="py-1 pr-2 text-right font-normal">8-10</th>
-            <th className="py-1 text-right font-normal">10-12</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filas.map((f, i) => (
-            <tr key={f.rotulo} className={cn('border-t border-border/60', i === 0 && 'font-semibold text-foreground')}>
-              <td className="whitespace-nowrap py-1 pr-2">{f.rotulo}</td>
-              <td className="py-1 pr-2 text-right">{f.pzH === null ? '—' : milesPunto(f.pzH)}</td>
-              <td className="py-1 pr-2 text-right">{f.p0Pct === null ? '—' : `${coma1(f.p0Pct)} %`}</td>
-              <td className="py-1 pr-2 text-right">{f.pesoMedioKg === null ? '—' : coma1(f.pesoMedioKg)}</td>
-              <td className="py-1 pr-2 text-right">{pct(f.c68)}</td>
-              <td className="py-1 pr-2 text-right">{pct(f.c810)}</td>
-              <td className="py-1 text-right">{pct(f.c1012)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {filas.length === 1 && <p className="mt-1.5 text-[12px] text-muted-foreground">Sin resúmenes de cierre de los días anteriores.</p>}
-    </div>
+    </Tarjeta>
   )
 }
 
@@ -346,6 +271,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
     [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
   )
   const [hoja, setHoja] = useState<HojaP0>(null)
+  const [loteAbierto, setLoteAbierto] = useState<number | null>(null)
   // Sin piezas del turno: solo las alertas (el lector caído antes del cambio de turno tiene que verse).
   if (d.serie.hastaMin === 0) {
     return d.alertas.length > 0 ? <div className="v2-vars" data-testid="grader-vivo"><Alertas d={d} ultimaHora={null} /></div> : null
@@ -354,6 +280,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
   const abrirAccion = (a: Accion) => {
     if (a.destino.tipo === 'tramo') setHoja({ tipo: 'tramo', desdeMin: Math.max(0, Math.floor((a.destino.desdeMs - d.serie.t0Ms) / 60_000)) })
     else if (a.destino.tipo === 'combo') setHoja({ tipo: 'fila', clave: 'calibre' })
+    else if (a.destino.tipo === 'lote') setLoteAbierto(indiceLote(d.lotes, a.destino.lote))
   }
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
@@ -362,7 +289,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
         <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
         {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} onAbrir={abrirAccion} />}
       </div>
-      <GraficoVivo d={d} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />
+      <GraficoVivo d={d} onAbrirLote={setLoteAbierto} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />
       {d.pesca?.seteo && (
         <>
           <SeteoGates s={d.pesca.seteo} />
@@ -371,11 +298,18 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
       )}
       {d.pesca && (
         <>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid items-start gap-3 lg:grid-cols-2">
             <PorQueP0 a={d.pesca.arbol} piezasTurno={d.totales.piezas} hasta={ultimaHora ?? ''} onAbrir={(k) => setHoja({ tipo: 'fila', clave: k })} />
-            <ZonaCompartida p={d.pesca} />
+            <div className="grid gap-3">
+              <LotesDelTurno filas={d.lotes} t0Ms={d.serie.t0Ms} hastaMin={d.serie.hastaMin} onAbrir={setLoteAbierto} />
+              <LineaManual d={d} />
+            </div>
           </div>
-          <LoteYPesca p={d.pesca} />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <ZonaCompartida p={d.pesca} />
+            <HistPeso p={d.pesca} />
+          </div>
+          <HojaLote filas={d.lotes} k={loteAbierto} t0Ms={d.serie.t0Ms} onCerrar={() => setLoteAbierto(null)} />
           <HojasP0
             hoja={hoja}
             onCerrar={() => setHoja(null)}
@@ -392,7 +326,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
       )}
       <div className="grid gap-3 lg:grid-cols-2">
         <CalibreCalidad d={d} />
-        <LineaManual d={d} />
+        {!d.pesca && <LineaManual d={d} />}
       </div>
     </div>
   )

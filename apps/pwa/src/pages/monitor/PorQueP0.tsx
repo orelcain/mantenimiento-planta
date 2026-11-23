@@ -29,7 +29,7 @@ function Chip({ tono: t, children }: { tono: string; children: React.ReactNode }
 }
 
 /** Barra horizontal: rótulo, barra y cifra. */
-function Barra({ rotulo, n, pct, color, title, nota, sub }: { rotulo: string; n: string; pct: number; color: string; title?: string; nota?: string; sub?: boolean }) {
+export function Barra({ rotulo, n, pct, color, title, nota, sub }: { rotulo: string; n: string; pct: number; color: string; title?: string; nota?: string; sub?: boolean }) {
   return (
     <>
       <span className={cn('min-w-0 text-[13px] leading-[18px]', sub ? 'pl-4 text-muted-foreground' : 'truncate font-medium text-foreground')} title={title}>
@@ -102,7 +102,7 @@ export function PorQueP0({ a, piezasTurno, hasta, onAbrir }: { a: ArbolP0; pieza
   )
 }
 
-function Seccion({ titulo, children, extra }: { titulo: string; children: React.ReactNode; extra?: React.ReactNode }) {
+export function Seccion({ titulo, children, extra }: { titulo: string; children: React.ReactNode; extra?: React.ReactNode }) {
   return (
     <section className="rounded-[14px] bg-card p-4">
       <h4 className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-foreground">{titulo}{extra}</h4>

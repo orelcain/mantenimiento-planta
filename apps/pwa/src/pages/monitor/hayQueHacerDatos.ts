@@ -11,7 +11,7 @@
  */
 import type { PiezaP0, ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import { RAFAGA_UMBRAL_PZ } from '@/services/grader/espejo/motivoP0'
-import type { LoteVivo } from '@/services/grader/espejo/pescaVivo'
+import type { LoteVivo, PerfilPesca } from '@/services/grader/espejo/pescaVivo'
 import { milesPunto } from '@/services/grader/espejo/alertasGrader'
 
 export const VENTANA_ACCION_MS = 15 * 60_000
@@ -64,18 +64,40 @@ const esPuertaExacta = (p: PiezaP0) => p.exacto && p.motivo === MOTIVO_PUERTA
 const sinGate = (p: PiezaP0) =>
   p.dueno === 'seteo' && (!p.exacto || p.motivo === MOTIVO_FDL) && (p.causa === 'sin-gate-peso' || p.causa === 'calidad-sin-gate')
 
-/** El lote en curso comparado con el anterior: distinto si el peso medio cambia ±10 % o un calibre sube 10 puntos. */
-export function compararLote(l: LoteVivo | null): { distinto: boolean; sube: { calibre: string; pct: number; antes: number } | null; pesoPct: number | null } {
-  if (!l?.anterior) return { distinto: false, sube: null, pesoPct: null }
-  const a = l.anterior.perfil
-  const b = l.perfil
+export interface CompararLote {
+  distinto: boolean
+  /** El calibre que más sube y el que más baja (puntos de %, por peso), con su % antes y ahora. */
+  sube: { calibre: string; pct: number; antes: number } | null
+  baja: { calibre: string; pct: number; antes: number } | null
+  pesoPct: number | null
+}
+
+/**
+ * Un lote comparado con el anterior: distinto si el peso medio cambia ±10 % o un calibre sube 10 puntos. Calibre
+ * POR PESO (`calibrePesoPct`, cada 2 lb): lo que trae el pescado, no el programa de las gates (como el mockup v4).
+ * La diferencia se redondea a 1 decimal antes de comparar con el umbral.
+ */
+export function compararPerfiles(a: PerfilPesca, b: PerfilPesca): CompararLote {
   const pesoPct = a.pesoMedioKg && b.pesoMedioKg ? ((b.pesoMedioKg - a.pesoMedioKg) / a.pesoMedioKg) * 100 : null
-  let sube: { calibre: string; pct: number; antes: number } | null = null
-  for (const [c, pct] of Object.entries(b.calibrePct)) {
-    const antes = a.calibrePct[c] ?? 0
-    if (pct - antes >= LOTE_CALIBRE_PTS && (!sube || pct - antes > sube.pct - sube.antes)) sube = { calibre: c, pct, antes }
+  let sube: CompararLote['sube'] = null
+  let baja: CompararLote['baja'] = null
+  let dSube = -Infinity
+  let dBaja = Infinity
+  for (const c of new Set([...Object.keys(a.calibrePesoPct), ...Object.keys(b.calibrePesoPct)])) {
+    const pct = b.calibrePesoPct[c] ?? 0
+    const antes = a.calibrePesoPct[c] ?? 0
+    const d = Math.round((pct - antes) * 10) / 10
+    if (d > dSube) { dSube = d; sube = { calibre: c, pct, antes } }
+    if (d < dBaja) { dBaja = d; baja = { calibre: c, pct, antes } }
   }
-  return { distinto: sube !== null || (pesoPct !== null && Math.abs(pesoPct) >= LOTE_PESO_PCT), sube, pesoPct }
+  const subeFirme = dSube >= LOTE_CALIBRE_PTS
+  return { distinto: subeFirme || (pesoPct !== null && Math.abs(pesoPct) >= LOTE_PESO_PCT), sube: subeFirme ? sube : null, baja, pesoPct }
+}
+
+/** El lote en curso comparado con el anterior (ver `compararPerfiles`). */
+export function compararLote(l: LoteVivo | null): CompararLote {
+  if (!l?.anterior) return { distinto: false, sube: null, baja: null, pesoPct: null }
+  return compararPerfiles(l.anterior.perfil, l.perfil)
 }
 
 /** Las acciones del momento. `hastaMs`: la última pieza leída. */

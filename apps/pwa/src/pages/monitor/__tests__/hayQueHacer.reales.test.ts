@@ -47,8 +47,8 @@ describe('¿Hay que hacer algo?, 18-11 T1', () => {
   it('04:30: revisar gates por el lote, agregar gate 10-12 Industrial y repartir 10-12 por la puerta', () => {
     const a = momento('04:30').acciones
     expect(a.map((x) => [x.titulo, x.detalle])).toEqual([
-      // Hallazgo: el mockup decía 50 % → 60 %; con el perfil de la salida del lote da 59 % → 74 %.
-      ['Revisar gates de 8-10 lb', 'lote …738 distinto: 8-10 lb pasa a 74 % (antes 59 %)'],
+      // Calibre por peso (como el mockup, 50 % → 60 %); por etiqueta de Matrix daría 59 % → 74 %.
+      ['Revisar gates de 8-10 lb', 'lote …738 distinto: 8-10 lb pasa a 61 % (antes 50 %)'],
       ['Agregar gate 10-12 lb Industrial', '134 kg a P0 (26 pz) en el turno'],
       // El mockup decía «gates 11 y 12» fijo; G11 pasó a 8-10 a las 03:21, así que a las 04:30 solo G12 tiene 10-12.
       ['Repartir 10-12 lb en más gates', '9 pz de puerta no preparada en 15 min (gate 12)'],
