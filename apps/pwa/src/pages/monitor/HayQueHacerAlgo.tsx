@@ -21,15 +21,16 @@ function Fila({ a, onAbrir }: { a: Accion; onAbrir?: (a: Accion) => void }) {
       {onAbrir ? <ChevronRight aria-hidden className="h-3.5 w-3.5 text-muted-foreground" /> : <span />}
     </>
   )
-  const clase = 'grid min-h-[52px] w-full grid-cols-[10px_1fr_14px] items-center gap-2.5 rounded-[14px] px-3 py-2.5 text-left'
+  // `v2-subtarjeta`: el gris de las subtarjetas del monitor (el `--v2-sub` del mockup no existe en monitorGlass.css).
+  const clase = 'v2-subtarjeta grid min-h-[52px] w-full grid-cols-[10px_1fr_14px] items-center gap-2.5 rounded-[14px] px-3 py-2.5 text-left'
   return (
     <li>
       {onAbrir ? (
-        <button type="button" onClick={() => onAbrir(a)} className={`${clase} transition-colors hover:bg-[color-mix(in_srgb,var(--v2-acento)_10%,transparent)]`} style={{ background: 'var(--v2-sub)' }}>
+        <button type="button" onClick={() => onAbrir(a)} className={`${clase} transition-colors hover:bg-[color-mix(in_srgb,var(--v2-acento)_10%,transparent)]`}>
           {cuerpo}
         </button>
       ) : (
-        <div className={clase} style={{ background: 'var(--v2-sub)' }}>{cuerpo}</div>
+        <div className={clase}>{cuerpo}</div>
       )}
     </li>
   )

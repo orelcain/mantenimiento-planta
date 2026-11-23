@@ -13,7 +13,7 @@ const MANUAL = 'var(--v2-acento)'
 
 function Muestra({ color, banda }: { color?: string; banda?: boolean }) {
   return banda
-    ? <i aria-hidden className="mr-1.5 inline-block h-2.5 w-3.5 rounded-sm border border-dashed align-middle" style={{ background: 'var(--v2-reja)', borderColor: 'var(--v2-gris)' }} />
+    ? <i aria-hidden className="mr-1.5 inline-block h-2.5 w-3.5 rounded-[3px] border border-dashed align-middle" style={{ background: 'var(--v2-reja)', borderColor: 'var(--v2-gris)' }} />
     : <i aria-hidden className="mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] align-middle" style={{ background: color }} />
 }
 
