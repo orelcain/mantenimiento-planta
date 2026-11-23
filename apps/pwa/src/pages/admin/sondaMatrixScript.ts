@@ -1,5 +1,5 @@
 /**
- * Sonda de solo lectura que se copia desde la página Diagnóstico Matrix: dice si Matrix se puede manejar sin mouse ni teclado.
+ * Sonda de solo lectura que se copia desde la página Diagnóstico Matrix: dice si Matrix se puede manejar sin mouse ni teclado, cómo está el lector del espejo en este PC y deja un resumen en el portapapeles.
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/sonda-controles-matrix.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
@@ -9,6 +9,8 @@ export const SONDA_MATRIX_PS1 = `# Sonda de controles de Matrix (Marelec). SOLO 
 #   Corrida 1: con el informe «Pieza pieza Grader» ya cargado en pantalla (también lista los combos,
 #   como el de periodo «Usuario definido», con sus opciones; no los despliega ni los cambia).
 #   Corrida 2: con la ventana de exportar o guardar abierta (sin guardar nada).
+#   También dice cómo está el lector del espejo en este PC (sección 7: solo mira sus archivos, sin red y sin
+#   abrir la llave) y deja un resumen corto (sección 8) en pantalla y en el portapapeles, para una foto o pegarlo.
 # No correr con la pantalla de Administración abierta (muestra la licencia).
 # El detalle queda en el Escritorio: sonda-matrix-HHmmss.txt
 & {  # todo en un bloque: al pegarlo corre de una vez y la pantalla queda limpia
@@ -186,7 +188,7 @@ else {
       F '    opciones: no se ven con el combo cerrado'
       if ($esPer) { $perSinOps = $true }
     }
-    if ($esPer) { $hayPer = $true }
+    if ($esPer) { $hayPer = $true; if (-not $st.perVisto) { $st.perVisto = $true; $st.perValor = Corto $valor 40; $st.perOps = @($ops | ForEach-Object { Corto $_ 30 }) } }
   }
   if ($relativas.Count -gt 0) { $st.combo = 'relativo' }
   elseif (-not $hayPer) { $st.combo = 'sin-periodo' }
@@ -218,6 +220,76 @@ switch ($st.combo) {
 }
 if ($st.licencia) { F 'OJO: hay texto de licencia en pantalla. Revisa el archivo antes de enviarlo.' }
 
+T '7. LECTOR DEL ESPEJO EN ESTE PC (solo sus archivos; sin red; la llave no se abre)'
+$lecDir = Join-Path $env:LOCALAPPDATA 'espejo-grader'
+if ($env:SONDA_DIR_LECTOR) { $lecDir = $env:SONDA_DIR_LECTOR }
+$lec = @{ hay = $false; ver = ''; num = $null; latMin = $null; latTipo = ''; vivo = '?'; tarea = '?'; pant = '?'; pantFalla = ''; ciclo = ''; ultPieza = ''; ordenes = ''; nueva = ''; periodo = '' }
+function Lec-Archivo([string]$nom) { Join-Path $lecDir $nom }
+if (-not (Test-Path -LiteralPath $lecDir)) { F ('No está instalado: no existe ' + $lecDir) }
+else {
+  $lec.hay = $true
+  try {
+    $lecLat = ([IO.File]::ReadAllText((Lec-Archivo 'latido.txt'))).Trim().Split(' ')
+    $lecT = [datetime]::MinValue
+    if ([datetime]::TryParse($lecLat[0], [ref]$lecT)) { $lec.latMin = [int][math]::Floor(((Get-Date) - $lecT).TotalMinutes) }
+    $lec.ver = [string]$lecLat[1]; $lec.latTipo = [string]$lecLat[2]
+  } catch { }
+  if ($lec.ver -match '^e(\\d{1,2}(\\.\\d{1,2}){1,2})$') { try { $lec.num = [version]$Matches[1] } catch { } }
+  F ("Versión instalada: {0}   último latido local: {1}" -f $(if ($lec.ver) { $lec.ver } else { '?' }), $(if ($null -ne $lec.latMin) { "hace $($lec.latMin) min ($($lec.latTipo))" } else { 'sin latido' }))
+  try {
+    $lecPid = [int](([IO.File]::ReadAllText((Lec-Archivo 'lector.pid'))).Trim())
+    $lecProc = Get-CimInstance Win32_Process -Filter ("ProcessId=$lecPid") -ErrorAction Stop
+    $lec.vivo = $(if ($lecProc -and [string]$lecProc.CommandLine -match 'lector-espejo') { 'sí' } else { 'no' })
+  } catch { $lec.vivo = 'no' }
+  try { $lecTar = Get-ScheduledTask -TaskName 'Espejo del grader' -ErrorAction Stop; $lec.tarea = [string]$lecTar.State } catch { $lec.tarea = 'no existe' }
+  F ("Proceso del lector vivo: {0}   tarea programada: {1}" -f $lec.vivo, $lec.tarea)
+  # Pantalla despierta: desde e1.7 el lector la pide en cada ciclo; el log solo anota cuando Windows no la toma.
+  $lecLog = @()
+  try { $lecLog = @(Get-Content -LiteralPath (Lec-Archivo 'lector.log') -Tail 600 -Encoding UTF8 -ErrorAction Stop) } catch { }
+  $lecIni = -1
+  for ($i = $lecLog.Count - 1; $i -ge 0; $i--) { if ($lecLog[$i] -match '^\\S+ \\S+ Arranque ') { $lecIni = $i; break } }
+  for ($i = $lecLog.Count - 1; $i -gt $lecIni; $i--) { if ($lecLog[$i] -match 'pantalla: Windows no tomó') { $lec.pantFalla = Corto $lecLog[$i] 120; break } }
+  if ($null -eq $lec.num) { $lec.pant = '?' }
+  elseif ($lec.num -lt [version]'1.7') { $lec.pant = 'no la pide (versión anterior a e1.7)' }
+  elseif ($lec.pantFalla) { $lec.pant = 'la pide, pero Windows no la tomó' }
+  else { $lec.pant = 'la pide (sin fallos en el log desde el arranque)' }
+  F ('Pantalla despierta: ' + $lec.pant)
+  if ($lec.pantFalla) { F ('    ' + $lec.pantFalla) }
+  for ($i = $lecLog.Count - 1; $i -ge 0; $i--) { if ($lecLog[$i] -match '^(\\S+ \\S+) ciclo: filas-pieza leídas=(\\d+) enviadas=(\\d+).*error=(.*)$') { $lec.ciclo = ('{0} leídas={1} enviadas={2}{3}' -f $Matches[1], $Matches[2], $Matches[3], $(if ($Matches[4]) { ' error=' + (Corto $Matches[4] 30) } else { '' })); break } }
+  for ($i = $lecLog.Count - 1; $i -ge 0; $i--) { if ($lecLog[$i] -match ' periodo: ') { $lec.periodo = Corto ($lecLog[$i] -replace '^\\S+ ', '') 110; break } }
+  F ('Última lectura (log): ' + $(if ($lec.ciclo) { $lec.ciclo } else { 'ninguna en las últimas 600 líneas' }))
+  try { $lecEst = Get-Content -LiteralPath (Lec-Archivo 'estado.json') -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json; $lec.ultPieza = [string]$lecEst.ultima } catch { }
+  F ('Última pieza enviada: ' + $(if ($lec.ultPieza) { $lec.ultPieza } else { '?' }))
+  $lecOrd = New-Object System.Collections.Generic.List[string]
+  foreach ($lecNom in @('RECARGA', 'PERIODO', 'DETENER', 'REVOCADA')) { if (Test-Path -LiteralPath (Lec-Archivo $lecNom)) { $lecOrd.Add($lecNom) } }
+  $lec.ordenes = $(if ($lecOrd.Count) { $lecOrd -join ', ' } else { 'ninguna' })
+  F ('Órdenes activas (archivos): ' + $lec.ordenes + $(if ($lecOrd.Contains('RECARGA')) { '   (con RECARGA el lector no cambia de versión)' } else { '' }))
+  try { $lecNue = Get-Content -LiteralPath (Lec-Archivo 'nuevo.json') -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json; $lec.nueva = [string]$lecNue.version } catch { }
+  if ($lec.nueva) { F ('Versión ya bajada, esperando al vigilante: ' + $lec.nueva) }
+  if ($lec.periodo) { F ('Periodo (log): ' + $lec.periodo) }
+  F ('Llave guardada: ' + $(if (Test-Path -LiteralPath (Lec-Archivo 'llave.dat')) { 'sí (no se abre)' } else { 'no' }))
+}
+
+T '8. RESUMEN (para una foto, o pegarlo: ya quedó copiado)'
+$res8 = New-Object System.Collections.Generic.List[string]
+$res8.Add(('Sonda {0:dd-MM HH:mm}  {1}  PowerShell {2}' -f (Get-Date), $env:COMPUTERNAME, $PSVersionTable.PSVersion))
+$res8.Add('Matrix: ' + $(if (-not $procs) { 'NO abierto' } elseif (-not $uia) { 'abierto, sin UI Automation' } else { "abierto, $($st.n) controles leídos" }))
+$perTxt = switch ($st.combo) { 'relativo' { 'HAY opción relativa' } 'sin-relativo' { 'sin opción relativa' } 'sin-opciones' { 'opciones no visibles: foto del combo desplegado' } 'sin-periodo' { 'no se halló el combo de periodo' } default { 'sin dato' } }
+$res8.Add('Periodo: ' + $perTxt + $(if ($st.perVisto) { ' | valor "' + $st.perValor + '"' } else { '' }))
+if ($st.perVisto -and @($st.perOps).Count) { $res8.Add('Opciones: ' + (Corto (@($st.perOps) -join '; ') 160)) }
+if (-not $lec.hay) { $res8.Add('Lector: no instalado en este usuario') }
+else {
+  $res8.Add(('Lector: {0} | latido {1} | proceso {2} | tarea {3}' -f $(if ($lec.ver) { $lec.ver } else { '?' }), $(if ($null -ne $lec.latMin) { "hace $($lec.latMin) min" } else { 'nunca' }), $lec.vivo, $lec.tarea))
+  $res8.Add('Pantalla: ' + $lec.pant)
+  $res8.Add('Última lectura: ' + $(if ($lec.ciclo) { $lec.ciclo } else { '?' }) + ' | última pieza ' + $(if ($lec.ultPieza) { $lec.ultPieza } else { '?' }))
+  $res8.Add('Órdenes: ' + $lec.ordenes + $(if ($lec.nueva) { ' | bajada ' + $lec.nueva } else { '' }))
+  if ($lec.periodo) { $res8.Add('Periodo del lector: ' + $lec.periodo) }
+}
+foreach ($x in $res8) { F $x }
+# Lo único que la sonda escribe fuera de su archivo: el resumen en el portapapeles (nada en Matrix).
+$copiado = $false
+if (-not $env:SONDA_SIN_PORTAPAPELES) { try { Set-Clipboard -Value ($res8 -join "\`r\`n"); $copiado = $true } catch { } }
+
 $out = Join-Path ([Environment]::GetFolderPath('Desktop')) ('sonda-matrix-{0:HHmmss}.txt' -f (Get-Date))
 if ($env:SONDA_SALIDA) { $out = $env:SONDA_SALIDA }
 @($L) + @('', 'DETALLE COMPLETO DE CONTROLES') + @($D) | Out-File -FilePath $out -Encoding utf8
@@ -226,5 +298,6 @@ Write-Host 'SONDA DE CONTROLES DE MATRIX  (solo lectura)' -ForegroundColor Yello
 foreach ($linea in $L) { if ($linea -match '^\\d\\. ') { Write-Host $linea -ForegroundColor Cyan } else { Write-Host $linea } }
 Write-Host ''
 Write-Host "Guardado en: $out" -ForegroundColor Yellow
+Write-Host $(if ($copiado) { 'El resumen (sección 8) quedó copiado: pégalo en el chat o saca una foto de la sección 8.' } else { 'No se pudo copiar el resumen: saca una foto de la sección 8.' }) -ForegroundColor Yellow
 }
 `

@@ -39,8 +39,32 @@ describe('SONDA_MATRIX_PS1', () => {
 
   it('es de solo lectura: no pulsa, no escribe ni mueve el foco en Matrix', () => {
     expect(SONDA_MATRIX_PS1).not.toMatch(
-      /\.Invoke\(\)|\.SetValue\(|\.Toggle\(\)|\.Select\(\)|\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
+      /\.Invoke\(\)|\.SetValue\(|\.Toggle\(\)|\.Select\(\)|\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|SendKeys|SendInput|mouse_event|keybd_event|clip\.exe/,
     )
+  })
+
+  it('solo escribe fuera de su archivo una vez: el resumen en el portapapeles', () => {
+    expect(SONDA_MATRIX_PS1.match(/Set-Clipboard/g)?.length).toBe(1)
+    expect(SONDA_MATRIX_PS1).toContain('Set-Clipboard -Value ($res8 -join "`r`n")')
+  })
+
+  it('sección 7: mira los archivos del lector sin red, sin abrir la llave y sin escribir en su carpeta', () => {
+    const s7 = SONDA_MATRIX_PS1.slice(SONDA_MATRIX_PS1.indexOf("T '7. LECTOR"), SONDA_MATRIX_PS1.indexOf("T '8. RESUMEN"))
+    expect(s7.length).toBeGreaterThan(1000)
+    for (const nom of ["'latido.txt'", "'lector.pid'", "'lector.log'", "'estado.json'", "'nuevo.json'", "'RECARGA', 'PERIODO', 'DETENER', 'REVOCADA'"]) {
+      expect(s7).toContain(nom)
+    }
+    // La llave solo se mira si existe: nunca se lee ni se descifra.
+    expect(s7).toContain("Test-Path -LiteralPath (Lec-Archivo 'llave.dat')")
+    expect(s7).not.toMatch(/Get-Content[^\n]*llave|ReadAllText[^\n]*llave|ConvertTo-SecureString|Unprotect|Invoke-WebRequest|Invoke-RestMethod|Net\.WebClient/)
+    expect(s7).not.toMatch(/Set-Content|Out-File|Remove-Item|New-Item|WriteAll|Move-Item|Stop-Process/)
+  })
+
+  it('sección 8: resumen corto con periodo, lector, pantalla, última lectura y órdenes', () => {
+    expect(SONDA_MATRIX_PS1).toContain("T '8. RESUMEN")
+    for (const k of ["'Periodo: '", "'Opciones: '", "'Pantalla: '", "'Última lectura: '", "'Órdenes: '"]) {
+      expect(SONDA_MATRIX_PS1).toContain(k)
+    }
   })
 
   it('no despliega ni elige opciones de los combos para leerlas', () => {
