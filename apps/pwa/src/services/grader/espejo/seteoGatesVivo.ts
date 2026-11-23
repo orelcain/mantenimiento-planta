@@ -33,6 +33,17 @@ const etiqueta = (p: PiezaEspejo): string => `${p.calibre} · ${p.calidad}`
 const minutoDe = (p: PiezaEspejo): string => p.ts.slice(0, 16)
 const ORDEN_CAL: Record<string, number> = { '0-2 lb': 0, '2-4 lb': 1, '4-6 lb': 2, '6-8 lb': 3, '8-10 lb': 4, '10-12 lb': 5, '12-UP lb': 6 }
 const calibreDe = (et: string) => et.split(' · ')[0] ?? ''
+
+const KG_POR_LB = 0.453592
+/**
+ * Rango en kg del calibre programado en la gate («8-10 lb · Premium» → 3,63–4,54). «12-UP» no tiene tope
+ * (`hi` = `null`). `null` si el programa no es un calibre en libras (p. ej. «Poco flujo»).
+ */
+export function rangoProgramaKg(programa: string | null): { lo: number; hi: number | null } | null {
+  const m = /^(\d+)-(\d+|UP)\s*lb/i.exec(calibreDe(programa ?? ''))
+  if (!m) return null
+  return { lo: Number(m[1]) * KG_POR_LB, hi: m[2]!.toUpperCase() === 'UP' ? null : Number(m[2]) * KG_POR_LB }
+}
 const calidadDe = (et: string) => et.split(' · ')[1] ?? ''
 
 /** Cuantil por rango sobre un arreglo ORDENADO. */

@@ -12,6 +12,7 @@ import { coma1, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import {
   EJE_PESO_KG,
   GATE_APAGADA_MIN,
+  rangoProgramaKg,
   type GateVivo,
   type SeteoVivo,
   type Solape,
@@ -52,9 +53,16 @@ function MarcaGate({ g }: { g: GateVivo }) {
 }
 
 /** Peso p1–p99 en el eje común 1–7 kg, con la franja de solape encima donde la cruza. */
-function EjePeso({ rango, solapes, mal, className }: { rango: [number, number] | null; solapes: readonly Solape[]; mal?: boolean; className?: string }) {
+function EjePeso({ rango, solapes, mal, programa, className }: { rango: [number, number] | null; solapes: readonly Solape[]; mal?: boolean; programa?: { lo: number; hi: number | null } | null; className?: string }) {
   return (
     <span className={cn('relative block h-2.5 rounded-full bg-muted', className)} role="img" aria-label={rango ? `${kg2(rango[0])} a ${kg2(rango[1])} kg` : 'sin peso'}>
+      {programa && (
+        <span
+          className="absolute -inset-y-1 rounded-[3px] border-x-2"
+          style={{ left: `${enEje(programa.lo)}%`, width: `${Math.max(1, enEje(programa.hi ?? EJE_MAX) - enEje(programa.lo))}%`, background: 'rgb(var(--foreground) / 0.22)', borderColor: 'rgb(var(--foreground) / 0.8)' }}
+          title={`Rango de la gate: ${kg2(programa.lo)}–${programa.hi === null ? 'sin tope' : kg2(programa.hi)} kg`}
+        />
+      )}
       {rango && (
         <span
           className="absolute inset-y-0 rounded-full"
@@ -119,7 +127,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
               <th className="py-1.5 pr-3 font-normal">Programa</th>
               <th className="py-1.5 pr-3 text-right font-normal">pz/min última hora</th>
               <th className="py-1.5 pr-3 text-right font-normal">% del flujo</th>
-              <th className="w-[30%] min-w-[220px] py-1.5 font-normal">Peso real p1–p99 (kg)<Ticks /></th>
+              <th className="w-[30%] min-w-[220px] py-1.5 font-normal">Peso real p1–p99 (kg) · franja = rango de la gate<Ticks /></th>
             </tr>
           </thead>
           <tbody>
@@ -138,7 +146,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                 </td>
                 <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g.pctHora)} %</td>
                 <td className="py-2">
-                  <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} />
+                  <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} programa={rangoProgramaKg(g.programa)} />
                   <span className="mt-1 block text-[12px] leading-[16px] text-muted-foreground">{rangoTxt(g.pesoKg)}</span>
                 </td>
               </tr>
@@ -174,7 +182,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
             <p className="mt-1 text-[13px] leading-[18px] tabular-nums text-foreground">
               <b className="font-semibold">{coma1(g.pzMinHora)} pz/min</b> · {coma1(g.pctHora)} % <span className="text-muted-foreground">· turno {coma1(g.pzMinTurno)}</span>
             </p>
-            <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} className="mt-2" />
+            <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} programa={rangoProgramaKg(g.programa)} className="mt-2" />
             <p className="mt-1 text-[12px] leading-[16px] tabular-nums text-muted-foreground">Peso {rangoTxt(g.pesoKg)} kg</p>
           </li>
         ))}
