@@ -58,6 +58,11 @@ export function LineaManual({ d, enCurso }: { d: DatosGraderVivo; enCurso: boole
             {r.n === 0 ? 'Sin tramos' : `${r.n} ${r.n === 1 ? 'tramo' : 'tramos'} · ${horasMin(r.min)} · ≈ ${milesPunto(r.pz)} pz`}
             <span className="ml-1.5 text-[13px] font-normal text-muted-foreground">de {textoManual(neto)} en el turno</span>
           </p>
+          {r.n > 0 && neto !== null && r.pz > neto && (
+            <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground" data-testid="manual-ruido">
+              La suma de los tramos supera el total del turno: es ruido del método. Contar en dos lugares deja horas con signo negativo que el total sí resta y los tramos no.
+            </p>
+          )}
           <svg viewBox={`0 0 ${Math.max(1, hasta)} 14`} preserveAspectRatio="none" className="mt-1.5 block h-3.5 w-full" aria-hidden>
             <rect x={0} y={4} width={Math.max(1, hasta)} height={6} rx={3} style={{ fill: 'rgb(var(--muted))' }} />
             {tramos.map(([a, b]) => <rect key={a} x={a} y={1} width={Math.max(2, b - a)} height={12} rx={2} style={{ fill: 'var(--v2-acento)' }} />)}
