@@ -146,8 +146,8 @@ function HojaFila({ f, hasta }: { f: FilaArbol; hasta: string }) {
             <tbody>
               {lista.map((p, i) => (
                 <tr key={`${p.ts}-${i}`} className="border-t border-border/40">
-                  <td className="py-1 tabular-nums">{p.ts.slice(11, 16)}</td>
-                  <td className="py-1 tabular-nums">{p.kg === null ? '—' : `${p.kg.toFixed(2).replace('.', ',')} kg`}</td>{/* decimal-tecnico: ya pasa a coma */}
+                  <td className="py-1 pr-2 tabular-nums">{p.ts.slice(11, 16)}</td>
+                  <td className="py-1 pr-2 tabular-nums whitespace-nowrap">{p.kg === null ? '—' : `${p.kg.toFixed(2).replace('.', ',')} kg`}</td>{/* decimal-tecnico: ya pasa a coma */}
                   <td className="py-1">{p.calidad}</td>
                   <td className="py-1">{p.gate}</td>
                 </tr>
