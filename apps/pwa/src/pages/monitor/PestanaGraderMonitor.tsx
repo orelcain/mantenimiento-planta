@@ -14,6 +14,9 @@ import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
 import { EspejoGraderCard, type TurnoDelMonitor } from '@/components/grader/EspejoGraderCard'
 import { LecturaEnVivo } from '@/components/grader/LecturaEnVivo'
+import { ActualizarCausasP0 } from '@/components/grader/ActualizarCausasP0'
+import { useEspejoP0 } from '@/services/grader/espejo/espejoP0.service'
+import { elegirFuenteP0 } from '@/services/grader/espejo/espejoP0'
 import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
 import { loadGate0Records, type StoredGate0Record } from '@/services/grader/graderGate0Store'
 import { buildDailySummaryId } from '@/services/grader/graderDailySummary.service'
@@ -237,6 +240,9 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
       .catch(() => { if (vigente) setGate0Exacto(null) })
     return () => { vigente = false }
   }, [gate0Id])
+  // e1.10: Puerta 0 que lee el espejo. Una sola fuente por turno (la que trae más registros; empate → Excel).
+  const p0Espejo = useEspejoP0(lineaDelEspejo(lineId), ventana)
+  const p0 = useMemo(() => elegirFuenteP0(gate0Exacto, p0Espejo, ventana), [gate0Exacto, p0Espejo, ventana])
   return (
     <div className="space-y-3">
       {ventana && !espejo.cargandoPiezas && (
@@ -251,7 +257,7 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           turnoEnCurso={turnoEnCurso}
           leidoHastaMs={leidoHastaMs}
           piezas={espejo.piezas}
-          gate0Exacto={gate0Exacto}
+          gate0Exacto={p0?.registros ?? null}
           publico={!esAdmin}
         />
       )}
@@ -266,7 +272,10 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
             publico={!esAdmin}
             turnoEnCurso={turnoEnCurso}
             turnoMonitor={turnoMonitor}
-            accion={<LecturaEnVivo linea={lineaDelEspejo(lineId)} lector={espejo.estado} />}
+            accion={<>
+              <LecturaEnVivo linea={lineaDelEspejo(lineId)} lector={espejo.estado} />
+              <ActualizarCausasP0 linea={lineaDelEspejo(lineId)} lector={espejo.estado} fuente={p0?.fuente ?? null} />
+            </>}
           />
         )}
         <CoberturaEnMonitor {...props} espejo={tramosEspejo} />

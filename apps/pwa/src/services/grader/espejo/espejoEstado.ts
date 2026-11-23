@@ -3,6 +3,7 @@
  * avisó y qué frase mostrar cuando trae un error. El reloj se inyecta (`ahoraMs`)
  * para que se pueda probar.
  */
+import type { EstadoP0Lector } from './espejoP0'
 
 /** El lector late cada 5 min; vivo = último latido hace ≤ 12 min (contrato). */
 export const VIVO_MAX_MIN = 12
@@ -16,6 +17,11 @@ export interface EstadoLector {
   ultimoLatidoMs: number | null
   leidoEn: string | null
   informe: string | null
+  /**
+   * Desde e1.10: última lectura de «Puerta 0» (va aparte para no pisar el latido de pieza). `null` si nunca leyó.
+   * `recibidoMs` = hora del servidor en que llegó.
+   */
+  p0?: { leidoEn: string | null; recibidoMs: number | null; estado: EstadoP0Lector } | null
   estado: {
     error?: string
     limite?: boolean
