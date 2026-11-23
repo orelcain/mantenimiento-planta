@@ -8,13 +8,15 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BellRing, Filter, Gauge, Hand, Layers, Package, ShieldAlert, SplitSquareHorizontal } from 'lucide-react'
+import { Activity, BellRing, Filter, Hand, Layers, Package, ShieldAlert, SplitSquareHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/graderVivo'
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { Tarjeta } from './TarjetaVivo'
+import { CuantoLlevamos } from './CuantoLlevamos'
+import { cuentaDelTurno } from './cuantoLlevamosDatos'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
@@ -79,36 +81,6 @@ function Cifra({ k, v, s, chico }: { k: string; v: string; s: string; chico?: bo
       <p className={cn('mt-1 font-semibold tracking-tight tabular-nums text-foreground', chico ? 'text-[20px] leading-[32px] lg:leading-[38px]' : 'text-[28px] leading-[32px] lg:text-[32px] lg:leading-[38px]')}>{v}</p>
       <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{s}</p>
     </div>
-  )
-}
-
-function Cifras({ d }: { d: Datos }) {
-  const s = d.salida
-  const parcial = s && s.minutos < 60 ? `últimos ${s.minutos} min, llevado a la hora` : 'última hora · Gate 1 en adelante'
-  const t = d.totales
-  const lote = d.serie.lote
-  return (
-    <Tarjeta titulo="El grader ahora" icono={<Gauge className={IC} />}>
-      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
-        <Cifra k="Piezas/h de salida" v={s ? milesPunto(s.piezasH) : '—'} s={parcial} />
-        <Cifra k="kg/h de salida" v={s ? milesPunto(s.kgH) : '—'} s={s?.pesoMedio ? `peso medio ${coma1(s.pesoMedio)} kg` : 'sin pesos'} />
-        {t.p0 !== null ? (
-          <Cifra k="P0 del turno" v={`${coma1(t.p0)} %`} s={`${milesPunto(t.g0)} de ${milesPunto(t.piezas)} piezas`} />
-        ) : (
-          <Cifra
-            k="P0 del turno"
-            v="—"
-            s={t.piezas >= PIEZAS_PARA_DECIR_SIN_GATE0 ? 'P0 llega con Puerta 0' : 'sin rechazos todavía'}
-          />
-        )}
-        <Cifra
-          k="Lote en curso"
-          v={lote ? loteLegible(lote.lote) : '—'}
-          s={lote ? `desde las ${horaDelEje(d.serie.t0Ms, lote.desdeMin)} · ${milesPunto(lote.piezas)} piezas` : 'sin lote'}
-          chico
-        />
-      </div>
-    </Tarjeta>
   )
 }
 
@@ -634,7 +606,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
       <div className="grid gap-3 lg:grid-cols-[2fr_3fr]">
         <Alertas d={d} ultimaHora={ultimaHora} />
-        <Cifras d={d} />
+        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
       </div>
       <Curva d={d} />
       {d.pesca?.seteo && (

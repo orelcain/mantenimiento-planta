@@ -92,10 +92,10 @@ describe('GraderVivo', () => {
     expect(screen.queryByText('0,0 %')).toBeNull()
   })
 
-  it('dibuja la curva del grader y el lote legible', () => {
+  it('dibuja la curva del grader y «¿Cuánto llevamos?»', () => {
     render(<GraderVivo {...entrada({})} />)
     expect(document.querySelector('[data-serie="grader"]')?.getAttribute('d')?.length).toBeGreaterThan(100)
-    expect(screen.getByText('720.260.739')).toBeTruthy()
+    expect(screen.getByTestId('cuanto-llevamos').textContent).toMatch(/^[\d.]+ pz[\d.]+ kg$/)
     expect(screen.getByText(/va \d+ min atrasada: es lo que tarda una pieza .* medido en este turno \(las curvas coinciden (bien|a medias)\)/)).toBeTruthy()
     expect(screen.queryByText(/\(r 0,/)).toBeNull()
     // Eje de P0 cada 15 min con «%»; el de piezas por minuto, sin él.
