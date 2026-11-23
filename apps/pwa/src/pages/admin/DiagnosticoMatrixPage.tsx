@@ -381,7 +381,7 @@ export function DiagnosticoMatrixPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Averigua dónde guarda Matrix sus datos: motor, servidor y base. El script solo lee: no se conecta a la base, no muestra usuarios, contraseñas ni la licencia y no cambia nada.
+            Averigua dónde guarda Matrix sus datos (motor, servidor y base) y si se pueden leer desde este PC sin la pantalla. El script solo lee: no se conecta a la base, no muestra usuarios, contraseñas ni la licencia y no cambia nada.
           </p>
           <Button
             size="sm"
@@ -392,7 +392,7 @@ export function DiagnosticoMatrixPage() {
             Copiar sondeo de la base de Matrix
           </Button>
           <p className="text-xs text-muted-foreground">
-            Pégalo en PowerShell en el PC de Matrix. Tarda menos de un minuto. Saca foto al veredicto; queda en el Escritorio como sondeo-base-matrix-HHmmss.txt.
+            Pégalo en PowerShell en el PC de Matrix, con Matrix abierto. Tarda menos de un minuto. Saca foto al veredicto; queda en el Escritorio como sondeo-base-matrix-HHmmss.txt.
           </p>
         </CardContent>
       </Card>

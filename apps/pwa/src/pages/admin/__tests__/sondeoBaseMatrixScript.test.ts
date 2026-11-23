@@ -97,6 +97,59 @@ describe('SONDEO_BASE_MATRIX_PS1', () => {
     expect(SONDEO_BASE_MATRIX_PS1).toContain('[regex]::Matches($limpio,')
   })
 
+  it('lista las bibliotecas SQL de Matrix y sus conexiones ya abiertas, sin abrir ninguna', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('CÓMO HABLA MATRIX CON SU SERVIDOR')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('qsql\\w*|Qt\\d*Sql\\w*|libpq')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('Get-NetTCPConnection -State Established')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'SQLite (archivo local, no servidor)'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('Matrix habla SQL con su servidor')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('habla con Matrix CS por un protocolo propio')
+    expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/TcpClient|Test-NetConnection|Test-Connection|\.Connect\(|Resolve-DnsName/i)
+  })
+
+  it('un plugin qsql* suelto no basta: el veredicto pide evidencia fuerte', () => {
+    // Qt copia varios drivers aunque el programa no los use: solo cuentan la biblioteca cliente,
+    // el driver cargado en memoria o una conexión abierta a un puerto de base.
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("elseif ($nombre -match '(?i)^qsql') { [void]$posibles.Add($md) }")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("' cargada en memoria'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'conexión abierta a ' + $par")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('$drvSrv = @(@($fuertes) | Sort-Object -Unique)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('Vía de lectura: posible, sin confirmar.')
+  })
+
+  it('no afirma «sin SQL en memoria» con una lista de módulos incompleta (proceso de 32 bits)', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'(?i)^kernel32\\.dll$'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('La evidencia en memoria queda sin revisar.')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('$memoriaRevisada = $true')
+  })
+
+  it('con el recorrido de archivos cortado el veredicto queda sin decidir', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('$recorridoCortado = ($st.vistos -ge 3000 -or $reloj.Elapsed.TotalSeconds -ge 25)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("elseif ($recorridoCortado) { F 'Vía de lectura: sin decidir.")
+    // El orden importa: «sin decidir» va antes que «posible» y que «protocolo propio».
+    const iCortado = SONDEO_BASE_MATRIX_PS1.indexOf('elseif ($recorridoCortado)')
+    expect(iCortado).toBeGreaterThan(0)
+    expect(iCortado).toBeLessThan(SONDEO_BASE_MATRIX_PS1.indexOf('elseif ($psb.Count)'))
+    expect(iCortado).toBeLessThan(SONDEO_BASE_MATRIX_PS1.indexOf('habla con Matrix CS por un protocolo propio'))
+  })
+
+  it('lee el registro de Marelec y Matrix con topes y sin mostrar secretos', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('REGISTRO DE MARELEC Y MATRIX')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'HKCU:\\Software', 'HKLM:\\SOFTWARE', 'HKLM:\\SOFTWARE\\WOW6432Node'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('$reg.claves -ge 200 -or $reg.valores -ge 400 -or $nivel -gt 5')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('pass|pwd|user|usuario|uid|login|licen')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('= (oculto)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('(cadena con credenciales, oculta)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('(valor opaco, omitido)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('clave de licencia omitida')
+  })
+
+  it('no pisa la lista del informe ni los datos del veredicto con variables de bucle', () => {
+    // PowerShell no distingue mayúsculas: un «foreach ($l …)» o «($v …)» suelto reemplaza a $L o a $V.
+    expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/foreach \(\$[lv] in /i)
+  })
+
   it('no contiene URLs http(s): no sale a la red', () => {
     expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/https?:\/\//i)
   })
