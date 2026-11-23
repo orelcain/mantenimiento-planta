@@ -97,6 +97,32 @@ describe('SONDEO_BASE_MATRIX_PS1', () => {
     expect(SONDEO_BASE_MATRIX_PS1).toContain('[regex]::Matches($limpio,')
   })
 
+  it('lista las bibliotecas SQL de Matrix y sus conexiones ya abiertas, sin abrir ninguna', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('CÓMO HABLA MATRIX CON SU SERVIDOR')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('qsql\\w*|Qt\\d*Sql\\w*|libpq')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('Get-NetTCPConnection -State Established')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'SQLite (archivo local, no servidor)'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('Matrix trae driver SQL de servidor')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('habla con Matrix CS por un protocolo propio')
+    expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/TcpClient|Test-NetConnection|Test-Connection|\.Connect\(|Resolve-DnsName/i)
+  })
+
+  it('lee el registro de Marelec y Matrix con topes y sin mostrar secretos', () => {
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('REGISTRO DE MARELEC Y MATRIX')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain("'HKCU:\\Software', 'HKLM:\\SOFTWARE', 'HKLM:\\SOFTWARE\\WOW6432Node'")
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('$reg.claves -ge 200 -or $reg.valores -ge 400 -or $nivel -gt 5')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('pass|pwd|user|usuario|uid|login|licen')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('= (oculto)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('(cadena con credenciales, oculta)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('(valor opaco, omitido)')
+    expect(SONDEO_BASE_MATRIX_PS1).toContain('clave de licencia omitida')
+  })
+
+  it('no pisa la lista del informe ni los datos del veredicto con variables de bucle', () => {
+    // PowerShell no distingue mayúsculas: un «foreach ($l …)» o «($v …)» suelto reemplaza a $L o a $V.
+    expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/foreach \(\$[lv] in /i)
+  })
+
   it('no contiene URLs http(s): no sale a la red', () => {
     expect(SONDEO_BASE_MATRIX_PS1).not.toMatch(/https?:\/\//i)
   })
