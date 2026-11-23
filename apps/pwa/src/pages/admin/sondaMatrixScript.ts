@@ -6,7 +6,8 @@
 export const SONDA_MATRIX_PS1 = `# Sonda de controles de Matrix (Marelec). SOLO LECTURA: no pulsa, no escribe ni cambia nada en Matrix.
 # Responde una pregunta: ¿se puede manejar Matrix sin mouse ni teclado (UI Automation de Windows)?
 # Uso: abrir Matrix, dejar en pantalla lo que se quiere mirar, abrir PowerShell, pegar TODO y Enter.
-#   Corrida 1: con el informe «Pieza pieza Grader» ya cargado en pantalla.
+#   Corrida 1: con el informe «Pieza pieza Grader» ya cargado en pantalla (también lista los combos,
+#   como el de periodo «Usuario definido», con sus opciones; no los despliega ni los cambia).
 #   Corrida 2: con la ventana de exportar o guardar abierta (sin guardar nada).
 # No correr con la pantalla de Administración abierta (muestra la licencia).
 # El detalle queda en el Escritorio: sonda-matrix-HHmmss.txt
@@ -55,6 +56,7 @@ T '2. PROCESO Y VENTANAS DE MATRIX'
 $procs = @(Get-Process | Where-Object { $_.ProcessName -match $filtro })
 $st = @{ n = 0; cortado = ''; sinAcceso = $false; licencia = $false; ventanas = 0 }
 $tipos = @{}; $pats = @{}; $marcos = @{}
+$combos = New-Object System.Collections.Generic.List[object]   # ComboBox vistos, para la sección 5
 $reloj = [Diagnostics.Stopwatch]::StartNew()
 $reClave = '(?i)export|excel|csv|guardar|save|archivo|file|10\\s?[.,]?000|recuperad|pieza|informe|report|actualizar|refresh|desde|hasta|fecha|imprimir|print'
 $reToolkit = '(?i)^(System\\.Windows\\.Forms|PresentationFramework|Qt\\d|vcl|rtl\\d|mfc\\d|wx|DevExpress|Telerik|Infragistics|Syncfusion|C1\\.|CrystalDecisions|FastReport|Stimulsoft|javaw|jvm|libcef|electron)'
@@ -77,6 +79,7 @@ function Nodo($e, [int]$nivel) {
     if ($pp -contains 'Value' -and $tipo -match 'Edit|ComboBox|Custom|Pane') { try { $extra += ' valor="' + (Corto $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value 40) + '"' } catch {} }
     if ($pp -contains 'Grid') { try { $g = $e.GetCurrentPattern([System.Windows.Automation.GridPattern]::Pattern).Current; $extra += " filas=$($g.RowCount) columnas=$($g.ColumnCount)" } catch {} }
     if (-not $c.IsEnabled) { $extra += ' (deshabilitado)' }
+    if ($tipo -eq 'ComboBox' -and $combos.Count -lt 30) { $combos.Add($e) }
     $linea = '[{0}] "{1}" id={2} clase={3} {{{4}}}{5}' -f $tipo, $nombre, (Corto $c.AutomationId 30), (Corto $c.ClassName 40), ($pp -join ','), $extra
     $D.Add(('  ' * $nivel) + $linea)
     $esControl = $tipo -match '^(Button|MenuItem|CheckBox|Edit|ComboBox|DataGrid|Table|TabItem|RadioButton|SplitButton|Hyperlink|Calendar|Text|StatusBar)$'
@@ -138,13 +141,81 @@ if ($clave.Count -eq 0) { F '(ninguno)' }
 foreach ($x in ($clave | Select-Object -First 40)) { F ('- ' + $x) }
 if ($clave.Count -gt 40) { F ("(... {0} más en el archivo)" -f ($clave.Count - 40)) }
 
-T '5. VEREDICTO'
+T '5. COMBOS DE LA VENTANA (¿hay un periodo que avance solo?)'
+# Solo lee: nombre, valor, estado y los ítems que el combo ya expone. Nada de desplegar, elegir ni enfocar.
+$reRel = '(?i)\\b(hoy|ayer|today|yesterday|[úu]ltim\\w*|last|semana\\w*|week\\w*|mes|month\\w*|turno\\w*|shift\\w*|current|hora\\w*|hours?|d[íi]as?|days?|anterior|previous)\\b'
+$rePer = '(?i)usuario\\s*defin|user\\s*defin|period|periodo|per[íi]odo|rango|range'
+$st.combo = ''; $relativas = New-Object System.Collections.Generic.List[string]; $otrasRel = New-Object System.Collections.Generic.List[string]
+function Opciones($e, [int]$nivel, $acc) {
+  if ($nivel -gt 4 -or $acc.visitas -ge 400) { return }
+  $h = $null; try { $h = $RW.GetFirstChild($e) } catch {}
+  while ($h -and $acc.visitas -lt 400) {
+    $acc.visitas++
+    try {
+      $t = $h.Current.ControlType.ProgrammaticName -replace '^ControlType\\.', ''
+      if ($t -match '^(ListItem|MenuItem|DataItem)$' -and $acc.items.Count -lt 60) { $acc.items.Add((Corto $h.Current.Name 50)) }
+    } catch {}
+    Opciones $h ($nivel + 1) $acc
+    try { $h = $RW.GetNextSibling($h) } catch { $h = $null }
+  }
+}
+if (-not $procs -or -not $uia) { F '(sin dato)' }
+elseif ($combos.Count -eq 0) { $st.combo = 'ninguno'; F 'No se vio ningún combo. Abre el informe «Pieza pieza Grader» y vuelve a pegar la sonda.' }
+else {
+  $RW = [System.Windows.Automation.TreeWalker]::RawViewWalker
+  if ($st.cortado) { F ("OJO: la lectura se cortó ({0}): puede faltar algún combo." -f $st.cortado) }
+  $n = 0; $hayPer = $false; $perConOps = $false; $perSinOps = $false
+  foreach ($e in $combos) {
+    $n++
+    try { $c = $e.Current } catch { F ("- combo {0}: no se pudo leer" -f $n); continue }
+    $valor = ''; try { $valor = $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value } catch {}
+    if (-not $valor) { try { $valor = (@($e.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection() | ForEach-Object { $_.Current.Name }) -join ', ') } catch {} }
+    $estado = ''; try { $estado = [string]$e.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Current.ExpandCollapseState } catch {}
+    $vecino = ''; try { $ant = $W.GetPreviousSibling($e); if ($ant) { $vecino = $ant.Current.Name } } catch {}
+    $acc = @{ visitas = 0; items = (New-Object System.Collections.Generic.List[string]) }
+    Opciones $e 0 $acc
+    $ops = @($acc.items | Where-Object { $_ } | Select-Object -Unique)
+    $esPer = ($valor -match $rePer) -or ($c.Name -match $rePer) -or ($vecino -match $rePer) -or (@($ops | Where-Object { $_ -match $rePer }).Count -gt 0)
+    F ("- combo {0}{1}: nombre=\`"{2}\`" junto a=\`"{3}\`" id={4} clase={5}" -f $n, $(if ($esPer) { ' (PROBABLE PERIODO)' } else { '' }), (Corto $c.Name 40), (Corto $vecino 30), (Corto $c.AutomationId 30), (Corto $c.ClassName 25))
+    F ("    valor actual=\`"{0}\`"  estado={1}{2}" -f (Corto $valor 50), $(if ($estado) { $estado } else { '?' }), $(if (-not $c.IsEnabled) { '  (deshabilitado)' } else { '' }))
+    if ($ops.Count -gt 0) {
+      F ("    opciones ({0}): {1}" -f $ops.Count, ($ops -join ' | '))
+      foreach ($o in $ops) { if ($o -match $reRel -and $o -notmatch $rePer) { if ($esPer) { $relativas.Add(('combo {0}: {1}' -f $n, $o)) } else { $otrasRel.Add(('combo {0}: {1}' -f $n, $o)) } } }
+      if ($esPer) { $perConOps = $true }
+    } else {
+      F '    opciones: no se ven con el combo cerrado'
+      if ($esPer) { $perSinOps = $true }
+    }
+    if ($esPer) { $hayPer = $true }
+  }
+  if ($relativas.Count -gt 0) { $st.combo = 'relativo' }
+  elseif (-not $hayPer) { $st.combo = 'sin-periodo' }
+  elseif ($perSinOps) { $st.combo = 'sin-opciones' }
+  else { $st.combo = 'sin-relativo' }
+}
+# Índice que Matrix guarda para el periodo (solo este valor; el resto del registro no se muestra).
+foreach ($k in @('HKCU:\\Software\\Marelec\\MATRIX CG', 'HKCU:\\Software\\Marelec')) {
+  try {
+    $pr = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
+    $rp = @($pr.PSObject.Properties | Where-Object { $_.Name -match '^ReportPeriod' })
+    if ($rp) { foreach ($x in $rp) { F ("Registro: {0} = {1}  (posición de la opción elegida; 0 = la primera)" -f $x.Name, (Corto ([string]$x.Value) 20)) }; break }
+  } catch {}
+}
+
+T '6. VEREDICTO'
 if (-not $procs) { F 'Sin dato: Matrix no estaba abierto.' }
 elseif (-not $uia) { F 'Sin dato: este PowerShell no pudo cargar UI Automation.' }
 elseif ($st.n -le 6 -and $st.sinAcceso) { F 'No se ven los controles y Windows niega leer el proceso: Matrix puede estar abierto como administrador. Repetir con PowerShell «como administrador».' }
 elseif ($st.n -le 6) { F 'Matrix NO expone sus controles (interfaz dibujada a mano). Solo quedarían clics simulados, que sí ocupan el mouse.' }
 elseif ($inv -ge 3) { F ("Matrix expone sus controles: {0} se pueden pulsar y {1} escribir sin mouse ni teclado. Falta la prueba real de exportar." -f $inv, $val) }
 else { F 'Matrix muestra la ventana pero casi ningún control pulsable. Resultado dudoso: hay que mirar el archivo.' }
+switch ($st.combo) {
+  'relativo' { F ('Periodo: hay opciones relativas que harían avanzar el rango solo: ' + (($relativas | Select-Object -First 6) -join '; ') + '. Sirve para un lector e1.9.') }
+  'sin-relativo' { F 'Periodo: el combo muestra sus opciones y ninguna es relativa (hoy, últimos N días...). El rango seguiría fijo.' }
+  'sin-opciones' { F 'Periodo: las opciones no se ven sin desplegar el combo (la sonda no lo despliega). Eso NO significa que no haya periodo relativo: saca una foto del combo de periodo desplegado y mándala.' }
+  'sin-periodo' { F ('Periodo: ningún combo parece de periodo (no se leyó «Usuario definido»). Revisa la lista de la sección 5 y saca una foto del combo de periodo desplegado.' + $(if ($otrasRel.Count) { ' Opciones relativas en otros combos: ' + (($otrasRel | Select-Object -First 4) -join '; ') + '.' } else { '' })) }
+  'ninguno' { F 'Periodo: sin dato, no se vio ningún combo.' }
+}
 if ($st.licencia) { F 'OJO: hay texto de licencia en pantalla. Revisa el archivo antes de enviarlo.' }
 
 $out = Join-Path ([Environment]::GetFolderPath('Desktop')) ('sonda-matrix-{0:HHmmss}.txt' -f (Get-Date))

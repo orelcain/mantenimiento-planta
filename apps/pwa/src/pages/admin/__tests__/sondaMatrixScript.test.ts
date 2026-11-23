@@ -42,4 +42,30 @@ describe('SONDA_MATRIX_PS1', () => {
       /\.Invoke\(\)|\.SetValue\(|\.Toggle\(\)|\.Select\(\)|\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
     )
   })
+
+  it('no despliega ni elige opciones de los combos para leerlas', () => {
+    expect(SONDA_MATRIX_PS1).not.toMatch(
+      /\.AddToSelection\(|\.RemoveFromSelection\(|\.ScrollIntoView\(|\.Realize\(|FindItemByProperty|\.Scroll\(|\.SetScrollPercent\(|Set-ItemProperty|New-ItemProperty|Remove-ItemProperty/,
+    )
+  })
+
+  it('lista los combos de la ventana con su valor, su estado y sus opciones', () => {
+    expect(SONDA_MATRIX_PS1).toContain("T '5. COMBOS DE LA VENTANA")
+    expect(SONDA_MATRIX_PS1).toContain('[System.Windows.Automation.TreeWalker]::RawViewWalker')
+    expect(SONDA_MATRIX_PS1).toContain('.Current.ExpandCollapseState')
+    expect(SONDA_MATRIX_PS1).toContain("T '6. VEREDICTO'")
+  })
+
+  it('distingue los cuatro casos del periodo y pide foto si las opciones no se ven', () => {
+    for (const caso of ["'relativo'", "'sin-relativo'", "'sin-opciones'", "'sin-periodo'", "'ninguno'"]) {
+      expect(SONDA_MATRIX_PS1).toContain(caso)
+    }
+    expect(SONDA_MATRIX_PS1).toContain('Eso NO significa que no haya periodo relativo')
+    expect(SONDA_MATRIX_PS1).toContain('saca una foto del combo de periodo desplegado')
+  })
+
+  it('del registro de Marelec solo muestra ReportPeriod', () => {
+    expect(SONDA_MATRIX_PS1).toContain("'HKCU:\\Software\\Marelec\\MATRIX CG'")
+    expect(SONDA_MATRIX_PS1).toContain("$_.Name -match '^ReportPeriod'")
+  })
 })
