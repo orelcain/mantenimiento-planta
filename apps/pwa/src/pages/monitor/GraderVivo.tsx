@@ -282,10 +282,15 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
           />
         </>
       )}
-      <div className="grid gap-3 lg:grid-cols-2">
+      {/* Con piezas, la Línea manual ya vive junto al árbol: Calibre y calidad va a todo el ancho (no queda sola en 2 columnas). */}
+      {d.pesca ? (
         <CalibreCalidad d={d} />
-        {!d.pesca && <LineaManual d={d} enCurso={turnoEnCurso} />}
-      </div>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <CalibreCalidad d={d} />
+          <LineaManual d={d} enCurso={turnoEnCurso} />
+        </div>
+      )}
     </div>
   )
 }
