@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.18.0' as const
+export const APP_VERSION = '4.19.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-11-22' as const
+export const VERSION_DATE = '2026-11-23' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Lector del grader e1.7: lee siempre y rellena solo los huecos del espejo' as const
+export const VERSION_NAME = 'Lector del grader e1.8: mantiene la sesión despierta desde el propio lector' as const
 
 /**
  * Nota:

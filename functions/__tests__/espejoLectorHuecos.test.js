@@ -84,7 +84,7 @@ test('el latido de e1.7 trae pantalla, matrix y huecos y la función lo acepta',
 
 test('el error del ciclo ya no se tapa con «pantalla-bloqueada» y la pantalla se pide con ES_DISPLAY_REQUIRED', () => {
   assert.ok(!LECTOR.includes("$errC = 'pantalla-bloqueada'"))
-  assert.ok(LECTOR.includes('SetThreadExecutionState([uint32]2147483651)'))
+  assert.ok(LECTOR.includes('function Pide-Pantalla([uint32]$flags = 2147483651) {'))
   // 0x80000003 = ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED.
   assert.strictEqual(0x80000003, 2147483651)
   // Nada de simular entrada ni de tocar políticas.

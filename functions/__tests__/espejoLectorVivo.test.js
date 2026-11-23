@@ -83,8 +83,8 @@ test('Espera-Ciclo: 60 s mientras dura el plazo, ESPEJO_CADA fuera de él; nunca
   ]), ['300', '60', '300', '300', '20', '60'])
 })
 
-test('el lector usa Espera-Ciclo para esperar, informa «vivo» en el latido y es e1.7', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.7'$/m)
+test('el lector usa Espera-Ciclo para esperar, informa «vivo» en el latido y es e1.8', () => {
+  assert.match(LECTOR, /^\$VERSION = 'e1\.8'$/m)
   assert.match(LECTOR, /^\$ESPERA_VIVO = 60$/m)
   assert.ok(LECTOR.includes('  $espera = Espera-Ciclo $cada $script:vivoFin (Get-Date)\n'))
   assert.ok(LECTOR.includes('parcial = $latParcial; vivo = (Texto-Vivo); recarga = '))

@@ -1,10 +1,10 @@
 /**
- * Instalador del lector del espejo del grader (e1.7) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la pantalla encendida, abre Matrix si no corre y rellena solo los huecos del espejo dentro del rango que muestra Matrix (acciona solo la casilla «Limitar» y «Actualizar»).
+ * Instalador del lector del espejo del grader (e1.8) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la sesión despierta desde el propio lector (y la devuelve al salir), abre Matrix si no corre y rellena solo los huecos del espejo dentro del rango que muestra Matrix (acciona solo la casilla «Limitar» y «Actualizar»).
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader (e1.7). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Instalador del lector del espejo del grader (e1.8). Pegar TODO en PowerShell y Enter. Un solo pegado.
   # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
   # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
   # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
@@ -100,8 +100,9 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 # Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
 # e1.5: la casilla se revisa en cada «Actualizar» aunque las fechas fallen. Matrix (Qt) ignora la escritura de sus
 # fechas por UI Automation: entonces «ajuste» = fechas-fijas y el fin del rango hay que moverlo a mano.
-# Mientras corre pide a Windows que no suspenda el equipo ni apague la pantalla (SetThreadExecutionState, e1.7). Con la
-# sesión bloqueada igual intenta leer, no mueve el rango y lo informa («bloqueada», «pantalla»).
+# Mientras corre pide a Windows que no suspenda el equipo ni apague la pantalla (SetThreadExecutionState, e1.7; e1.8 lo
+# devuelve al salir y dice por qué falló). Con la sesión bloqueada igual intenta leer, no mueve el rango y lo informa
+# («bloqueada», «pantalla»).
 # Configuración por variables de entorno (opcionales): ESPEJO_URL, ESPEJO_CADA (s, 300), ESPEJO_FILTRO
 # (matrix|marelec), ESPEJO_DIR (%LOCALAPPDATA%\\espejo-grader), ESPEJO_EQUIPO (nombre del PC),
 # ESPEJO_ESPERA_RECARGA (s, 12), ESPEJO_TOPE_CICLO (s, 600), ESPEJO_TOPE_TRAMO (s, 90: la lectura de la
@@ -134,8 +135,14 @@ $ErrorActionPreference = 'Continue'
 #     fechas por UI Automation y el lector no teclea. Latido: clave «huecos» (filas releídas / filas de las horas con hueco).
 #   · El error del ciclo va tal cual aunque la sesión esté bloqueada (antes se tapaba con «pantalla-bloqueada»).
 #   · Recarga e1.6: el total del avance es el de la última tabla leída (antes salía «/0» si el ciclo fallaba).
+# e1.8 — sesión despierta sin ventana aparte (probado a mano en planta el 23-11: con el pedido vivo no salió el
+# protector de pantalla en ~10 min):
+#   · El pedido de pantalla se hace desde el mismo lector oculto, al arrancar y en cada ciclo, en su único hilo.
+#   · Si el tipo de Windows no se puede crear o Windows rechaza el pedido, la clave «pantalla» lo dice:
+#     «no-pedida:<sin-tipo|rechazo|error>» (el detalle va al log una vez). Un tipo que ya existe no es error.
+#   · Al salir limpio (DETENER, versión nueva, fin) devuelve el equipo a lo normal (solo ES_CONTINUOUS).
 
-$VERSION = 'e1.7'
+$VERSION = 'e1.8'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -947,8 +954,21 @@ function Texto-Recarga($rec, [string]$cierre, [int]$recorridas, [int]$filas, [st
 # ---- e1.7: pantalla despierta y políticas de bloqueo ----
 # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED: ni suspensión ni pantalla apagada mientras el lector corre
 # (es lo que hace un reproductor de video). No simula teclas ni mouse. $true si Windows aceptó el pedido.
-function Pide-Pantalla {
-  try { return ([EspejoGrader.Energia]::SetThreadExecutionState([uint32]2147483651) -ne 0) } catch { return $false }
+# e1.8: el pedido vale para el hilo que lo hace; el bucle principal corre en un solo hilo y lo renueva en cada ciclo.
+# Si falla deja el motivo en $script:pantallaMotivo (sin-tipo | rechazo | error) y el detalle en el log, una vez.
+# Con $flags = 2147483648 (solo ES_CONTINUOUS) devuelve el equipo a lo normal al salir.
+function Pide-Pantalla([uint32]$flags = 2147483651) {
+  $motivo = ''
+  if ($script:energiaError) { $motivo = 'sin-tipo' }
+  else {
+    try { if ([EspejoGrader.Energia]::SetThreadExecutionState($flags) -eq 0) { $motivo = 'rechazo' } }
+    catch { $motivo = 'error'; $script:energiaError2 = [string]$_.Exception.Message }
+  }
+  if ($flags -eq 2147483651) {
+    if ($motivo -and $motivo -ne $script:pantallaMotivo) { Log ('pantalla: Windows no tomó el pedido de pantalla despierta (' + $motivo + $(if ($script:energiaError) { ': ' + $script:energiaError } elseif ($script:energiaError2) { ': ' + $script:energiaError2 } else { '' }) + ').') }
+    $script:pantallaMotivo = $motivo
+  }
+  return (-not $motivo)
 }
 
 function Valor-Registro([string]$ruta, [string]$nombre) {
@@ -984,7 +1004,7 @@ function Texto-Pantalla([bool]$pedida, [bool]$bloqueada, [datetime]$ahora) {
   $b = 'sin-bloqueo'
   if ($script:bloqueoDesde) { $b = 'bloqueada-desde ' + $script:bloqueoDesde.ToString('yyyy-MM-dd HH:mm') }
   elseif ($script:ultimoBloqueo) { $b = 'ultimo-bloqueo ' + $script:ultimoBloqueo.ToString('yyyy-MM-dd HH:mm') }
-  $t = $(if ($pedida) { 'pedida' } else { 'no-pedida' }) + ' ' + $b
+  $t = $(if ($pedida) { 'pedida' } elseif ($script:pantallaMotivo) { 'no-pedida:' + $script:pantallaMotivo } else { 'no-pedida' }) + ' ' + $b
   if ($script:politicas) { $t += ' ' + $script:politicas }
   if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
   return $t
@@ -1300,7 +1320,13 @@ $script:ajuste = $(if ($rangoAuto) { '' } else { 'apagado' })
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
 # e1.7: que el equipo no se suspenda ni apague la pantalla mientras el lector corre (Pide-Pantalla, se repite en cada
 # ciclo). No simula teclas ni mouse, y las políticas de bloqueo de TI solo se leen: no se tocan.
-try { Add-Type -Namespace EspejoGrader -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop } catch { }
+# e1.8: si el tipo ya existe (mismo proceso) no es error; si no se pudo crear, el motivo viaja en «pantalla».
+$script:energiaError = ''
+$script:energiaError2 = ''
+$script:pantallaMotivo = ''
+if (-not ('EspejoGrader.Energia' -as [type])) {
+  try { Add-Type -Namespace EspejoGrader -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop } catch { $script:energiaError = [string]$_.Exception.Message; if ($script:energiaError.Length -gt 160) { $script:energiaError = $script:energiaError.Substring(0, 160) } }
+}
 $script:pantallaPedida = Pide-Pantalla
 $script:politicas = Politicas-Bloqueo
 $script:bloqueoDesde = $null
@@ -1546,6 +1572,8 @@ while (-not $terminar) {
     }
   }
 }
+# e1.8: al salir limpio el equipo vuelve a suspender y apagar la pantalla como siempre (solo ES_CONTINUOUS).
+$null = Pide-Pantalla 2147483648
 Log 'Fin del lector.'
 try { $script:mutex.ReleaseMutex() } catch { }
 exit 0

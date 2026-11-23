@@ -8,14 +8,15 @@ describe('frasePantalla (e1.7)', () => {
   })
 
   it('pantalla pedida y sin bloqueo: sin aviso', () => {
-    expect(frasePantalla('pedida sin-bloqueo')).toEqual({ texto: 'encendida (pedida a Windows) · sin bloqueo', aviso: null })
+    expect(frasePantalla('pedida sin-bloqueo')).toEqual({ texto: 'despierta (pedida a Windows) · sin bloqueo', aviso: null })
   })
 
-  it('bloqueo por política de TI: lo dice y no la evade', () => {
+  it('bloqueo por política de TI: lo dice, sin mandar a pedir nada a TI', () => {
     const f = frasePantalla('pedida bloqueada-desde 2026-11-22 02:15 inactividad=900s(ti)')!
-    expect(f.texto).toBe('encendida (pedida a Windows) · bloqueada desde 2026-11-22 02:15')
+    expect(f.texto).toBe('despierta (pedida a Windows) · bloqueada desde 2026-11-22 02:15')
     expect(f.aviso).toMatch(/política de TI \(bloqueo por inactividad a los 15 min\)/)
-    expect(f.aviso).toMatch(/no la evade/)
+    expect(f.aviso).toMatch(/aunque el lector pedía la pantalla despierta/)
+    expect(f.aviso).not.toMatch(/pedir a TI|excepción/)
   })
 
   it('protector con contraseña del usuario: se puede quitar en Configuración', () => {
@@ -28,6 +29,35 @@ describe('frasePantalla (e1.7)', () => {
 
   it('texto desconocido: se muestra tal cual', () => {
     expect(frasePantalla('otra cosa')).toEqual({ texto: 'otra cosa', aviso: null })
+  })
+})
+
+describe('frasePantalla (e1.8: por qué no quedó despierta)', () => {
+  it('no-pedida con motivo: lo dice y avisa aunque la sesión no se haya bloqueado aún', () => {
+    const f = frasePantalla('no-pedida:sin-tipo sin-bloqueo')!
+    expect(f.texto).toBe('sin pedir: no se pudo preparar la llamada a Windows · sin bloqueo')
+    expect(f.aviso).toMatch(/no pudo mantener la sesión despierta/)
+    expect(f.aviso).toMatch(/lector\.log/)
+  })
+
+  it('rechazo y error, con bloqueo y política: el motivo manda en el aviso', () => {
+    expect(frasePantalla('no-pedida:rechazo sin-bloqueo')!.texto).toBe('sin pedir: Windows rechazó el pedido · sin bloqueo')
+    const f = frasePantalla('no-pedida:error bloqueada-desde 2026-11-23 03:10 protector=600s(ti)')!
+    expect(f.texto).toBe('sin pedir: la llamada a Windows falló · bloqueada desde 2026-11-23 03:10')
+    expect(f.aviso).toMatch(/no pudo mantener la sesión despierta \(la llamada a Windows falló\)/)
+  })
+
+  it('motivo desconocido: se muestra tal cual', () => {
+    expect(frasePantalla('no-pedida:otro sin-bloqueo')!.texto).toBe('sin pedir: otro · sin bloqueo')
+  })
+
+  it('no-pedida sin motivo y política de TI: no dice que el lector pedía la pantalla', () => {
+    const f = frasePantalla('no-pedida bloqueada-desde 2026-11-23 03:10 protector=600s(ti)')!
+    expect(f.aviso).toMatch(/^La sesión se bloqueó\. Hay una política de TI/)
+  })
+
+  it('no-pedida sin motivo (lector e1.7): igual que antes', () => {
+    expect(frasePantalla('no-pedida sin-bloqueo')).toEqual({ texto: 'sin pedir (Windows no aceptó) · sin bloqueo', aviso: null })
   })
 })
 

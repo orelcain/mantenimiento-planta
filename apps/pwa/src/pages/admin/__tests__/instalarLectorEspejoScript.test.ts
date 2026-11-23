@@ -62,8 +62,11 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
   })
 
   it('e1.7: pide pantalla encendida y sin suspensión (ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED), sin simular entrada', () => {
-    expect(S).toContain('SetThreadExecutionState([uint32]2147483651)')
-    expect(S.match(/SetThreadExecutionState\(\[uint32\]/g)?.length).toBe(1)
+    expect(S).toContain('function Pide-Pantalla([uint32]$flags = 2147483651) {')
+    expect(S.match(/SetThreadExecutionState\(/g)?.length).toBe(2) // la declaración del tipo y la única llamada
+    // e1.8: al salir limpio lo devuelve (solo ES_CONTINUOUS) y nunca usa el hex, que en PS 5.1 es un Int32 negativo.
+    expect(S).toContain("$null = Pide-Pantalla 2147483648\nLog 'Fin del lector.'")
+    expect(S).not.toMatch(/0x8000000[0-3]/i)
     // Las políticas de bloqueo solo se leen: nada de powercfg, LockWorkStation ni escrituras de registro.
     expect(S).not.toMatch(/powercfg|LockWorkStation|Set-ItemProperty|New-ItemProperty|reg(\.exe)? add/i)
     expect(S).toContain("'InactivityTimeoutSecs'")
@@ -81,8 +84,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).not.toMatch(/Stop-Process[^\n]*(matrix|marelec)|CloseMainWindow|taskkill/i)
   })
 
-  it('es la versión e1.7 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.7'"])
+  it('es la versión e1.8 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.8'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })

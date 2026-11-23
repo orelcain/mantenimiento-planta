@@ -354,25 +354,38 @@ export function fraseRecarga(
   return { texto: recarga, aviso: null }
 }
 
+/** e1.8: motivo con que el lector dice que Windows no tomó el pedido de pantalla despierta (`no-pedida:<motivo>`). */
+const MOTIVO_PANTALLA: Record<string, string> = {
+  'sin-tipo': 'no se pudo preparar la llamada a Windows',
+  rechazo: 'Windows rechazó el pedido',
+  error: 'la llamada a Windows falló',
+}
+
 /**
  * e1.7: frase de la pantalla del PC de planta (clave `pantalla`). `aviso` sale cuando la sesión se bloqueó con la
- * pantalla pedida: la causa es una política (de TI o del usuario) o alguien la bloqueó a mano. El lector no la evade.
+ * pantalla pedida: la causa es una política (de TI o del usuario) o alguien la bloqueó a mano.
+ * e1.8: «no-pedida:<motivo>» dice por qué Windows no tomó el pedido; entonces el protector puede bloquear la sesión.
  */
 export function frasePantalla(pantalla: string | undefined): { texto: string; aviso: string | null } | null {
   if (!pantalla) return null
-  const m = /^(pedida|no-pedida) (sin-bloqueo|bloqueada-desde (\S+ \S+)|ultimo-bloqueo (\S+ \S+))(?: (.*))?$/.exec(pantalla)
+  const m = /^(pedida|no-pedida(?::(\S+))?) (sin-bloqueo|bloqueada-desde (\S+ \S+)|ultimo-bloqueo (\S+ \S+))(?: (.*))?$/.exec(pantalla)
   if (!m) return { texto: pantalla, aviso: null }
   const pedida = m[1] === 'pedida'
-  const politicas = (m[5] ?? '').split(' ').filter(Boolean)
+  const motivo = m[2] ? (MOTIVO_PANTALLA[m[2]] ?? m[2]) : null
+  const desde = m[4]
+  const ultimo = m[5]
+  const politicas = (m[6] ?? '').split(' ').filter(Boolean)
   const ti = politicas.filter((p) => p.endsWith('(ti)')).map((p) => p.replace(/^inactividad=(\d+)s\(ti\)$/, (_, s) => `bloqueo por inactividad a los ${Math.round(Number(s) / 60)} min`).replace(/^protector=(\d*)s\(ti\)$/, (_, s) => `protector de pantalla con contraseña${s ? ` a los ${Math.round(Number(s) / 60)} min` : ''}`))
   const usuario = politicas.some((p) => p.endsWith('(usuario)'))
-  const bloqueo = m[3] ? `bloqueada desde ${m[3]}` : m[4] ? `último bloqueo ${m[4]}` : 'sin bloqueo'
-  const texto = `${pedida ? 'encendida (pedida a Windows)' : 'sin pedir (Windows no aceptó)'} · ${bloqueo}`
+  const bloqueo = desde ? `bloqueada desde ${desde}` : ultimo ? `último bloqueo ${ultimo}` : 'sin bloqueo'
+  const estado = pedida ? 'despierta (pedida a Windows)' : motivo ? `sin pedir: ${motivo}` : 'sin pedir (Windows no aceptó)'
+  const texto = `${estado} · ${bloqueo}`
   let aviso: string | null = null
-  if (m[3] || m[4]) {
-    if (ti.length) aviso = `La sesión se bloquea por una política de TI (${ti.join('; ')}). El lector no la evade: pedir a TI una excepción para este PC.`
+  if (!pedida && motivo) aviso = `El lector no pudo mantener la sesión despierta (${motivo}): el protector de pantalla puede bloquearla. El detalle está en lector.log del PC de planta.`
+  else if (desde || ultimo) {
+    if (ti.length) aviso = `La sesión se bloqueó${pedida ? ' aunque el lector pedía la pantalla despierta' : ''}. Hay una política de TI (${ti.join('; ')}) o alguien la bloqueó a mano (Windows + L).`
     else if (usuario) aviso = 'La sesión se bloquea por el protector de pantalla con contraseña de este usuario de Windows: se puede quitar en Configuración › Personalización › Pantalla de bloqueo.'
-    else if (pedida) aviso = 'La sesión se bloqueó con la pantalla encendida: alguien la bloqueó a mano (Windows + L) o hay una política que el lector no ve.'
+    else if (pedida) aviso = 'La sesión se bloqueó con la pantalla despierta: alguien la bloqueó a mano (Windows + L) o hay una política que el lector no ve.'
   }
   return { texto, aviso }
 }
