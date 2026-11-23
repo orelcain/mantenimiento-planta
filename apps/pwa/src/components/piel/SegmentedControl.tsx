@@ -21,8 +21,10 @@ export interface Segment<T extends string> {
   value: T
   label: ReactNode
   icon?: ReactNode
+  /** Texto de ayuda nativo del segmento (`title`); no cambia su nombre accesible. */
+  title?: string
   /**
-   * Agrupa el segmento en una pista propia dentro del mismo `tablist` (p. ej. «Planta Principal» | «Referencia»).
+   * Agrupa el segmento en una pista propia dentro del mismo `tablist` (p. ej. «Planta Principal» | Yal).
    * Si ningún segmento trae grupo, el control se dibuja igual que siempre.
    */
   grupo?: GrupoSegmento
@@ -30,7 +32,7 @@ export interface Segment<T extends string> {
 
 export interface GrupoSegmento {
   clave: string
-  /** Rótulo sobre la pista en celular, o a la izquierda en PC si no hay `tituloCorto`. */
+  /** Rótulo sobre la pista en celular, o a la izquierda en PC si no hay `tituloCorto`. `null`: pista sin rótulo. */
   titulo: ReactNode
   /** Rótulo corto para PC (en línea con la pista). */
   tituloCorto?: ReactNode
@@ -110,7 +112,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
       g.items.push({ s, i })
     })
     return (
-      <div role="tablist" aria-label={ariaLabel} className={cn('flex gap-2', enLinea ? 'items-center' : 'items-start', className)}>
+      <div role="tablist" aria-label={ariaLabel} className={cn('flex gap-2', enLinea ? 'items-center' : 'items-end', className)}>
         {grupos.map(g => (
           <div key={g.clave || 'sin-grupo'} className={cn('flex min-w-0', enLinea ? 'shrink-0 items-center gap-2' : 'flex-col', !enLinea && (g.ajustado ? 'shrink-0' : 'flex-1'))}>
             {g.titulo != null && (
@@ -129,6 +131,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
                     type="button"
                     role="tab"
                     aria-selected={on}
+                    title={s.title}
                     tabIndex={i === tabulable ? 0 : -1}
                     onClick={() => onChange(s.value)}
                     onKeyDown={e => alTeclear(e, i)}
@@ -173,6 +176,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
             type="button"
             role="tab"
             aria-selected={on}
+            title={s.title}
             tabIndex={i === tabulable ? 0 : -1}
             onClick={() => onChange(s.value)}
             onKeyDown={e => alTeclear(e, i)}
