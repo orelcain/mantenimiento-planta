@@ -36,6 +36,7 @@ import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
 import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import { hayQueHacer } from './hayQueHacerDatos'
+import { arbolP0 } from './porQueP0Datos'
 
 /** El aviso de cambio de lote se muestra la primera hora del lote nuevo. */
 export const LOTE_AVISO_MIN = 60
@@ -116,6 +117,10 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
   ]
   return {
     p0Dueno,
+    // «Por qué va a P0»: la raíz es la Puerta 0 del turno (sin las piezas de prueba de antes del inicio).
+    arbol: arbolP0(p0Dueno, gate0Exacto ? gate0Exacto.filter((r) => r.ts >= ini && r.ts < fin) : null),
+    /** Piezas del turno (para el detalle de un minuto en la hoja). */
+    piezas: pz,
     hacer: hayQueHacer(p0Dueno, lote, ultMs),
     causas: causasP0Vivo(pz),
     lote,
