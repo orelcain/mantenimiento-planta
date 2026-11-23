@@ -51,6 +51,11 @@ describe('frasePantalla (e1.8: por qué no quedó despierta)', () => {
     expect(frasePantalla('no-pedida:otro sin-bloqueo')!.texto).toBe('sin pedir: otro · sin bloqueo')
   })
 
+  it('no-pedida sin motivo y política de TI: no dice que el lector pedía la pantalla', () => {
+    const f = frasePantalla('no-pedida bloqueada-desde 2026-11-23 03:10 protector=600s(ti)')!
+    expect(f.aviso).toMatch(/^La sesión se bloqueó\. Hay una política de TI/)
+  })
+
   it('no-pedida sin motivo (lector e1.7): igual que antes', () => {
     expect(frasePantalla('no-pedida sin-bloqueo')).toEqual({ texto: 'sin pedir (Windows no aceptó) · sin bloqueo', aviso: null })
   })

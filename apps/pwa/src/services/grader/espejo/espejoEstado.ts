@@ -383,7 +383,7 @@ export function frasePantalla(pantalla: string | undefined): { texto: string; av
   let aviso: string | null = null
   if (!pedida && motivo) aviso = `El lector no pudo mantener la sesión despierta (${motivo}): el protector de pantalla puede bloquearla. El detalle está en lector.log del PC de planta.`
   else if (desde || ultimo) {
-    if (ti.length) aviso = `La sesión se bloqueó aunque el lector pedía la pantalla despierta. Hay una política de TI (${ti.join('; ')}) o alguien la bloqueó a mano (Windows + L).`
+    if (ti.length) aviso = `La sesión se bloqueó${pedida ? ' aunque el lector pedía la pantalla despierta' : ''}. Hay una política de TI (${ti.join('; ')}) o alguien la bloqueó a mano (Windows + L).`
     else if (usuario) aviso = 'La sesión se bloquea por el protector de pantalla con contraseña de este usuario de Windows: se puede quitar en Configuración › Personalización › Pantalla de bloqueo.'
     else if (pedida) aviso = 'La sesión se bloqueó con la pantalla despierta: alguien la bloqueó a mano (Windows + L) o hay una política que el lector no ve.'
   }
