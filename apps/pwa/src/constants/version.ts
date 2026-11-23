@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.20.0' as const
+export const APP_VERSION = '4.21.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-23' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Lector del grader e1.9: periodo relativo apagado y sonda con estado del lector' as const
+export const VERSION_NAME = 'Sonda: selector de informes de Matrix (¿se puede pasar a Puerta 0 sin mouse?)' as const
 
 /**
  * Nota:
