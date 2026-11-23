@@ -48,7 +48,7 @@ const IC = "h-3.5 w-3.5"
 function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   const a = d.alertas
   // Último tramo de 15 min cerrado con piezas suficientes: el mismo que mira la alerta «P0 alto».
-  const ultimoP0 = [...d.p0].reverse().find((t) => t.completo && !t.pocaMasa && t.pct !== null) ?? null
+  const ultimoP0 = d.totales.p0 === null ? null : [...d.p0].reverse().find((t) => t.completo && !t.pocaMasa && t.pct !== null) ?? null
   return (
     <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'} icono={<BellRing className={IC} />}>
       <ul className="mt-3 space-y-2" aria-label="Alertas del grader">

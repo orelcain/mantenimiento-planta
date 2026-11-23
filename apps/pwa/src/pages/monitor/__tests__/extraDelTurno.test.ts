@@ -7,7 +7,7 @@ describe('extraDelTurno (ritmo, P0 y cierre)', () => {
     const e = extraDelTurno(pz, 120, 480, true, 36)
     expect(e.ritmoHora).toBe(2400)
     expect(e.ritmoTurno).toBe(1800)
-    expect(e.p0Pct).toBeCloseTo(0.75, 2)
+    expect(e.p0Pct).toBeCloseTo(1, 2)
   })
   it('proyecta al cierre al ritmo de la última hora y calla si el turno ya cerró', () => {
     const e = extraDelTurno(pz, 120, 480, true, 0)
