@@ -25,7 +25,8 @@ function bloquePeriodo() {
 }
 
 function powershell() {
-  for (const exe of process.platform === 'win32' ? ['powershell.exe', 'pwsh'] : ['pwsh']) {
+  // Solo Windows PowerShell: los casos cargan UI Automation, que pwsh de Linux (CI) no trae.
+  for (const exe of process.platform === 'win32' ? ['powershell.exe'] : []) {
     const r = spawnSync(exe, ['-NoProfile', '-NonInteractive', '-Command', '$PSVersionTable.PSVersion.Major'], { encoding: 'utf8' })
     if (r.status === 0) return exe
   }
