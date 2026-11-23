@@ -31,9 +31,10 @@ describe('desglose de P0 por dueño', () => {
     expect(suma(d.seteo)).toBe(r.seteo.pz)
   })
 
-  it('con motivo exacto, fotocélula y puerta salen por su nombre bajo Mantención', () => {
+  it('con motivo exacto, fotocélula sale bajo Mantención y puerta bajo Seteo (23-11)', () => {
     const d = desgloseP0(clasificarP0(piezas, registros(1)))
-    expect(d.mantencion.map((x) => x.rotulo)).toEqual(expect.arrayContaining(['No leído por fotocélula', 'Puerta no preparada']))
-    expect(d.seteo.map((x) => x.rotulo)).toContain('Fuera de límites')
+    expect(d.mantencion.map((x) => x.rotulo)).toContain('No leído por fotocélula')
+    expect(d.mantencion.map((x) => x.rotulo)).not.toContain('Puerta no preparada')
+    expect(d.seteo.map((x) => x.rotulo)).toEqual(expect.arrayContaining(['Fuera de límites', 'Puerta no preparada']))
   })
 })

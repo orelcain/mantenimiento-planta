@@ -103,7 +103,7 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
       regla: 'rafaga-fotocelula',
       nivel: 'mal',
       desdeMin: desdeMin(new Date(rafaga.desdeMs).toISOString()),
-      titulo: rafaga.estimado || rafaga.puerta > 0
+      titulo: rafaga.estimado
         ? `${hm(rafaga.desdeMs)} · ${rafaga.pz} piezas de fotocélula o puerta en 15 min${est}`
         : `${hm(rafaga.desdeMs)} · ${rafaga.pz} piezas sin leer por la fotocélula en 15 min`,
       detalle: `De ${hm(rafaga.desdeMs)} a ${hm(rafaga.hastaMs)} · ${milesPunto(Math.round(rafaga.kg))} kg a P0. Revisar el lente de la fotocélula.`,

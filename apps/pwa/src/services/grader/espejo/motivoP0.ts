@@ -1,7 +1,12 @@
 /**
  * Motivo P0 por pieza: cruza las piezas de Gate 0 del espejo con los registros de Puerta 0 (Matrix, Excel) y
- * reparte el P0 entre Mantención (fotocélula, puerta) y seteo y pesca («Fuera de límites»). Sin registro exacto,
- * la pieza se estima con `causasP0Vivo` (seteo inferido de las piezas). Puro: sin Firestore ni DOM.
+ * reparte el P0 entre Mantención (fotocélula) y seteo y pesca («Fuera de límites» y «Puerta no preparada»). Sin
+ * registro exacto, la pieza se estima con `causasP0Vivo` (seteo inferido de las piezas). Puro: sin Firestore ni DOM.
+ *
+ * 23-11 (decisión aprobada, mockup v4): «Puerta no preparada» es de Seteo. La puerta no alcanza a volver porque el
+ * calibre carga muchas piezas seguidas en las mismas gates: se arregla repartiendo el calibre en más gates, no
+ * con mantención. Sin Puerta 0, «tenía gate» no separa fotocélula de puerta: esas piezas quedan en Mantención como
+ * estimado y así se rotulan.
  */
 import type { PiezaEspejo } from './espejoFilas'
 import { SeteoInferido, causasP0Vivo, type CausaP0 } from './pescaVivo'
@@ -12,7 +17,7 @@ export type DuenoP0 = 'mantencion' | 'seteo'
 /** Motivos exactos de Puerta 0 que sí dicen de quién son. Clave: texto normalizado (sin acentos, minúsculas). */
 const DUENO_DE_MOTIVO: Record<string, DuenoP0> = {
   'no leido por fotocelula': 'mantencion',
-  'puerta no preparada': 'mantencion',
+  'puerta no preparada': 'seteo',
   'fuera de limites': 'seteo',
 }
 
@@ -181,11 +186,9 @@ export function duenoDelTramo(porPieza: readonly PiezaP0[], t0Ms: number, desdeM
   return { dueno: mant * 2 > total ? 'mantencion' : 'seteo', mant, total, estimado: estimadoPz > 0 }
 }
 
-/**
- * Precisión del estimado sin Puerta 0: de las piezas que caen en «tenía gate», el 74 % es de verdad fotocélula o puerta
- * (402 de 543, 7 turnos del 16 al 19-11-2026, cruzadas con Puerta 0). Las de los otros grupos son 100 % «Fuera de límites».
- */
-export const PRECISION_ESTIMADO_PCT = 74
+// 23-11: se quitó `PRECISION_ESTIMADO_PCT = 74`. Se había medido para fotocélula + puerta juntas (402 de 543 piezas
+// «tenía gate», 7 turnos del 16 al 19-11); con la puerta en Seteo ya no vale, y solo 4 de esos turnos traen puerta
+// (41 piezas). Mientras no se vuelva a medir, el estimado se rotula «estimado» sin porcentaje.
 
 export const RAFAGA_VENTANA_MS = 15 * 60_000
 /** Piezas de Mantención en la ventana para decir que hay ráfaga. Umbral ilustrativo, a validar en terreno. */
@@ -196,15 +199,13 @@ export interface RafagaP0 {
   hastaMs: number
   pz: number
   kg: number
-  /** Piezas de la ráfaga con motivo «Puerta no preparada» (exacto). */
-  puerta: number
-  /** Alguna pieza de la ráfaga no tiene motivo exacto. */
+  /** Alguna pieza de la ráfaga no tiene motivo exacto (puede traer piezas de puerta: sin Puerta 0 no se separan). */
   estimado: boolean
 }
 
 /**
- * Ráfaga de Mantención: ≥ `umbral` piezas de fotocélula o puerta en una ventana de 15 min. Si hay varias, la que
- * termina más tarde. `null` si no hay ninguna.
+ * Ráfaga de Mantención: ≥ `umbral` piezas de fotocélula (o «tenía gate» estimado) en una ventana de 15 min. Si hay
+ * varias, la que termina más tarde. `null` si no hay ninguna.
  */
 export function rafagaFotocelula(porPieza: readonly PiezaP0[], umbral = RAFAGA_UMBRAL_PZ, ventanaMs = RAFAGA_VENTANA_MS): RafagaP0 | null {
   const mant = porPieza
@@ -227,7 +228,6 @@ export function rafagaFotocelula(porPieza: readonly PiezaP0[], umbral = RAFAGA_U
         hastaMs: mant[j]!.t,
         pz: suma,
         kg: v.reduce((s, p) => s + p.kg, 0),
-        puerta: v.filter((p) => p.motivo !== null && norm(p.motivo) === 'puerta no preparada').reduce((s, p) => s + p.cantidad, 0),
         estimado: v.some((p) => !p.exacto),
       }
     }
@@ -254,8 +254,8 @@ const ROTULO_ESTIMADO: Partial<Record<CausaP0, string>> = {
  */
 export function desgloseP0(r: ResumenP0): { mantencion: LineaDesglose[]; seteo: LineaDesglose[] } {
   const orden: Record<'mantencion' | 'seteo', string[]> = {
-    mantencion: ['No leído por fotocélula', 'Puerta no preparada', ROTULO_ESTIMADO['tenia-gate']!],
-    seteo: ['Fuera de límites', ROTULO_ESTIMADO['calidad-sin-gate']!, ROTULO_ESTIMADO['sin-gate-peso']!, ROTULO_ESTIMADO['calidad-d']!],
+    mantencion: ['No leído por fotocélula', ROTULO_ESTIMADO['tenia-gate']!],
+    seteo: ['Fuera de límites', 'Puerta no preparada', ROTULO_ESTIMADO['calidad-sin-gate']!, ROTULO_ESTIMADO['sin-gate-peso']!, ROTULO_ESTIMADO['calidad-d']!],
   }
   const cuenta = { mantencion: new Map<string, number>(), seteo: new Map<string, number>() }
   for (const p of r.porPieza) {

@@ -100,8 +100,15 @@ describe('clasificarP0', () => {
   it('exacto cuando todas las piezas tienen motivo', () => {
     const b = pieza({ ts: '2026-11-18T22:39:00.000Z', pesoKg: 1.5 })
     const r = clasificarP0([b], [reg('2026-11-18T22:39:00', 1.5, 'Puerta no preparada')])
-    expect(r.mantencion.pz).toBe(1)
     expect(r.exactitud).toBe('exacto')
+  })
+
+  it('«Puerta no preparada» es de Seteo, no de Mantención (decisión 23-11)', () => {
+    const b = pieza({ ts: '2026-11-18T22:39:00.000Z', pesoKg: 1.5 })
+    const r = clasificarP0([b], [reg('2026-11-18T22:39:00', 1.5, 'Puerta no preparada')])
+    expect(r.seteo.pz).toBe(1)
+    expect(r.mantencion.pz).toBe(0)
+    expect(r.porPieza[0]).toMatchObject({ dueno: 'seteo', exacto: true })
   })
 })
 

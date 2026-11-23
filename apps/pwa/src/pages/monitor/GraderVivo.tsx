@@ -20,7 +20,7 @@ import { cuentaDelTurno } from './cuantoLlevamosDatos'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
-import { PRECISION_ESTIMADO_PCT, desgloseP0 } from '@/services/grader/espejo/motivoP0'
+import { desgloseP0 } from '@/services/grader/espejo/motivoP0'
 
 type Datos = DatosGraderVivo
 
@@ -390,12 +390,12 @@ function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
   const sub = `${milesPunto(r.pz)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
   const desglose = desgloseP0(r)
   const pctExacto = r.pctExacto === null ? 0 : r.pctExacto
-  // «exacto» del estimado = precisión medida de «tenía gate» contra Puerta 0; en mixto, cuántas piezas traen su motivo.
+  // En mixto, cuántas piezas traen su motivo. Sin Puerta 0, fotocélula y puerta no se separan (23-11).
   const fuente = r.exactitud === 'exacto'
     ? 'motivo de Matrix (Puerta 0)'
     : r.exactitud === 'mixto'
       ? `motivo de Matrix en el ${Math.round(pctExacto)} % de las piezas · resto estimado`
-      : `estimado · ${PRECISION_ESTIMADO_PCT} % exacto`
+      : 'estimado sin Puerta 0 · fotocélula y puerta no se separan'
   const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k === 'No leído por fotocélula' ? 'Fotocélula' : k} {milesPunto(n)}</p> : null)
   return (
     <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>
