@@ -19,6 +19,7 @@ import {
   opcionGrafico,
   seguirVentana,
   ventanaInicial,
+  zoomAncla,
   type FiltroDueno,
   type TemaGrafico,
   type Ventana,
@@ -112,11 +113,87 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
   const opcion = useMemo(() => (tema && ancho > 0 ? opcionGrafico(g, v, filtro, tema, ancho) : null), [g, v.a, v.b, filtro, tema, ancho]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fijar = useCallback((nv: Ventana) => setVentana(limitarVentana(nv, g.hasta)), [g.hasta])
-  const zoom = (f: number) => {
-    const c = (v.a + v.b) / 2
-    const len = (v.b - v.a) * f
-    fijar({ a: c - len / 2, b: c + len / 2 })
-  }
+  const zoom = (f: number) => fijar(zoomAncla(v, f, 0.5, g.hasta))
+
+  // Gestos: rueda (zoom bajo el cursor), pellizco de dos dedos y arrastre con el mouse. Con un dedo el celular sigue
+  // haciendo scroll de la página (`touch-action: pan-y`).
+  const estado = useRef({ v, hasta: g.hasta })
+  estado.current = { v, hasta: g.hasta }
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fracDe = (clientX: number) => {
+      const r = el.getBoundingClientRect()
+      const util = Math.max(1, r.width - GEOM.izq - GEOM.der)
+      return { frac: (clientX - r.left - GEOM.izq) / util, util }
+    }
+    const aplicar = (fn: (v: Ventana, hasta: number) => Ventana) => setVentana(fn(estado.current.v, estado.current.hasta))
+    const onWheel = (e: WheelEvent) => {
+      const { frac } = fracDe(e.clientX)
+      if (frac < -0.05 || frac > 1.05) return
+      e.preventDefault()
+      const k = Math.exp(Math.max(-300, Math.min(300, e.deltaY)) * (e.ctrlKey ? 0.01 : 0.0015))
+      aplicar((v0, h) => zoomAncla(v0, k, frac, h))
+    }
+    const punt = new Map<number, { x: number; y: number }>()
+    let arrastre: { x: number; v: Ventana; movio: boolean } | null = null
+    let distAntes = 0
+    const dist = () => { const [p, q] = [...punt.values()]; return Math.hypot(p!.x - q!.x, p!.y - q!.y) }
+    const medio = () => { const [p, q] = [...punt.values()]; return (p!.x + q!.x) / 2 }
+    let medioAntes = 0
+    const onDown = (e: PointerEvent) => {
+      punt.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (punt.size === 2) { distAntes = dist(); medioAntes = medio(); arrastre = null }
+      else if (punt.size === 1 && e.pointerType === 'mouse' && e.button === 0 && fracDe(e.clientX).frac >= 0 && fracDe(e.clientX).frac <= 1) arrastre = { x: e.clientX, v: estado.current.v, movio: false }
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!punt.has(e.pointerId)) return
+      punt.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (punt.size === 2) {
+        const d = dist()
+        const m = medio()
+        if (distAntes > 0 && d > 0) {
+          const { frac, util } = fracDe(m)
+          const k = distAntes / d
+          const largo = estado.current.v.b - estado.current.v.a
+          aplicar((v0, h) => zoomAncla(v0, k, frac, h, -((m - medioAntes) / util) * largo))
+        }
+        distAntes = d
+        medioAntes = m
+      } else if (arrastre) {
+        const dx = e.clientX - arrastre.x
+        if (Math.abs(dx) > 4) arrastre.movio = true
+        if (arrastre.movio) {
+          const { util } = fracDe(e.clientX)
+          const largo = arrastre.v.b - arrastre.v.a
+          setVentana(limitarVentana({ a: arrastre.v.a - (dx / util) * largo, b: arrastre.v.b - (dx / util) * largo }, estado.current.hasta))
+        }
+      }
+    }
+    const onUp = (e: PointerEvent) => {
+      punt.delete(e.pointerId)
+      distAntes = 0
+      if (punt.size === 0 && arrastre?.movio) {
+        // Un arrastre no es un clic sobre una barra de P0.
+        const tragar = (ev: Event) => { ev.stopPropagation(); ev.preventDefault() }
+        el.addEventListener('click', tragar, { capture: true, once: true })
+        setTimeout(() => el.removeEventListener('click', tragar, { capture: true }), 0)
+      }
+      if (punt.size === 0) arrastre = null
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+    }
+  }, [ref])
   const onZoom = useCallback(() => {
     const inst = chart.current?.getEchartsInstance()
     const dz = (inst?.getOption() as { dataZoom?: Array<{ startValue?: number; endValue?: number }> } | undefined)?.dataZoom?.[0]
@@ -152,7 +229,7 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
       <p className="mt-2 text-[13px] leading-[18px] text-muted-foreground tabular-nums" aria-live="polite" data-testid="rango-grafico">
         {horaDelEje(g.t0Ms, v.a)}–{horaDelEje(g.t0Ms, v.b)} · {largoVentana(v.b - v.a)} · {modoP0(v) === '15' ? 'P0 cada 15 min' : 'P0 por minuto'}
       </p>
-      <div ref={ref} className="mt-1 w-full" style={{ height: alto }}>
+      <div ref={ref} className="mt-1 w-full" style={{ height: alto, touchAction: 'pan-y' }}>
         {opcion && (
           <ReactECharts
             ref={chart}

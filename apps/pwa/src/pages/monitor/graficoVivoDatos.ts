@@ -51,6 +51,18 @@ export function limitarVentana(v: Ventana, hasta: number): Ventana {
 }
 
 /**
+ * Zoom anclado: `factor` < 1 acerca, > 1 aleja, y el minuto que está en la fracción `frac` (0–1) del ancho útil
+ * se queda bajo el dedo o el cursor. `desplazMin` mueve la ventana (arrastre). Puro: lo prueban los gestos.
+ */
+export function zoomAncla(v: Ventana, factor: number, frac: number, hasta: number, desplazMin = 0): Ventana {
+  const f = Math.min(1, Math.max(0, frac))
+  const largo = v.b - v.a
+  const ancla = v.a + largo * f
+  const nuevo = Math.max(1, largo * factor)
+  return limitarVentana({ a: ancla - nuevo * f + desplazMin, b: ancla + nuevo * (1 - f) + desplazMin }, hasta)
+}
+
+/**
  * La ventana al llegar dato nuevo: si estaba pegada al final, avanza con él (mismo largo); si no, se queda donde
  * la dejó la persona.
  */
@@ -369,7 +381,7 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
     ],
     yAxis: [yEje(0, tope1, false), yEje(1, topeP0, modo === '15')],
     dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', startValue: v.a, endValue: v.b, minValueSpan: ZOOM_MIN_MIN, disabled: angosto },
+      { type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', startValue: v.a, endValue: v.b, minValueSpan: ZOOM_MIN_MIN, disabled: true }, // los gestos (rueda, pellizco, arrastre) los maneja GraficoVivo: el inside de ECharts no respondía
       {
         type: 'slider',
         xAxisIndex: [0, 1, 2],

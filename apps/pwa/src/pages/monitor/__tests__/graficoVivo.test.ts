@@ -16,6 +16,7 @@ import {
   barrasP0,
   datosGrafico,
   limitarVentana,
+  zoomAncla,
   marcasEje,
   modoP0,
   opcionGrafico,
@@ -175,5 +176,22 @@ describe('datos y opción del gráfico', () => {
     const g2 = datosGrafico(a0430(false))
     expect(g2.porPieza).toBeNull()
     expect(() => opcionGrafico(g2, { a: 0, b: 435 }, '', TEMA, 375)).not.toThrow()
+  })
+})
+
+describe('zoomAncla (rueda, pellizco y arrastre)', () => {
+  it('acerca dejando fijo el minuto bajo el cursor', () => {
+    const v = zoomAncla({ a: 0, b: 400 }, 0.5, 0.25, 435)
+    expect(v).toEqual({ a: 50, b: 250 }) // el minuto 100 (25 %) sigue al 25 % del ancho
+  })
+  it('aleja y respeta los bordes del turno', () => {
+    expect(zoomAncla({ a: 100, b: 200 }, 10, 0.5, 435)).toEqual({ a: 0, b: 435 })
+  })
+  it('no baja del zoom mínimo', () => {
+    const v = zoomAncla({ a: 100, b: 110 }, 0.01, 0.5, 435)
+    expect(v.b - v.a).toBe(ZOOM_MIN_MIN)
+  })
+  it('el desplazamiento mueve la ventana sin cambiar su largo', () => {
+    expect(zoomAncla({ a: 100, b: 160 }, 1, 0.5, 435, 20)).toEqual({ a: 120, b: 180 })
   })
 })
