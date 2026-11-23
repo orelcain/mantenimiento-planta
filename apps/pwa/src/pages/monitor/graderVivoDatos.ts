@@ -35,6 +35,7 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
 import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
+import { hayQueHacer } from './hayQueHacerDatos'
 
 /** El aviso de cambio de lote se muestra la primera hora del lote nuevo. */
 export const LOTE_AVISO_MIN = 60
@@ -115,6 +116,7 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
   ]
   return {
     p0Dueno,
+    hacer: hayQueHacer(p0Dueno, lote, ultMs),
     causas: causasP0Vivo(pz),
     lote,
     hora: { desde: hora[0]?.ts.slice(11, 16) ?? '', hasta: pz[pz.length - 1]!.ts.slice(11, 16) },

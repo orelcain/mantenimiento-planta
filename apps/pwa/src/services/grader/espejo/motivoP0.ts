@@ -9,7 +9,7 @@
  * estimado y así se rotulan.
  */
 import type { PiezaEspejo } from './espejoFilas'
-import { SeteoInferido, causasP0Vivo, type CausaP0 } from './pescaVivo'
+import { SeteoInferido, derivarP0, type CausaP0 } from './pescaVivo'
 import type { StoredGate0Record } from '../graderGate0Store'
 
 export type DuenoP0 = 'mantencion' | 'seteo'
@@ -65,6 +65,12 @@ export interface PiezaP0 {
   exacto: boolean
   /** Causa estimada (seteo inferido). `null` si la pieza no tiene peso. */
   causa: CausaP0 | null
+  /** Calidad de la pieza, tal cual viene del espejo. */
+  calidad: string
+  /** Calibres en que cabe por peso (ver `derivarP0`). Vacío sin peso o bajo 900 g. */
+  calibres: string[]
+  /** Gates que en ese momento tenían su calibre (cualquier calidad), por calibre. */
+  gatesCalibre: Record<string, number[]>
 }
 
 export interface GrupoP0 {
@@ -99,16 +105,10 @@ function sumar(g: GrupoP0, p: PiezaP0): void {
   else g.estimadoPz += p.cantidad
 }
 
-/** Causa estimada de una pieza: la única clave de `causasP0Vivo` con piezas. */
-function causaDe(piezaGate0: PiezaEspejo, seteo: SeteoInferido): CausaP0 | null {
-  const c = causasP0Vivo([piezaGate0], seteo)
-  const k = (Object.keys(c.causas) as CausaP0[]).find((x) => c.causas[x] > 0)
-  return k ?? null
-}
-
 /** Clasifica todas las piezas de Gate 0 del turno (`piezas` puede traer gate>0: son el seteo inferido). */
 export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly StoredGate0Record[] | null): ResumenP0 {
   const seteo = new SeteoInferido(piezas)
+  const gates = seteo.gates()
   const g0 = piezas.filter((p) => p.gate === 0)
   const motivos = registros && registros.length > 0 ? cruzarPuerta0(g0, registros) : g0.map(() => null)
   const out: ResumenP0 = {
@@ -124,7 +124,8 @@ export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly
   }
   g0.forEach((p, i) => {
     const kg = p.pesoKg ?? 0
-    const causa = causaDe(p, seteo)
+    const der = derivarP0(p, seteo, gates)
+    const causa = der?.causa ?? null
     const motivo = motivos[i] ?? null
     const duenoExacto = motivo !== null ? DUENO_DE_MOTIVO[norm(motivo)] : undefined
     let dueno: PiezaP0['dueno']
@@ -137,7 +138,7 @@ export function clasificarP0(piezas: readonly PiezaEspejo[], registros: readonly
     } else {
       dueno = causa === 'tenia-gate' ? 'mantencion' : 'seteo'
     }
-    const pieza: PiezaP0 = { ts: p.ts, cantidad: p.cantidad, kg, dueno, motivo, exacto, causa }
+    const pieza: PiezaP0 = { ts: p.ts, cantidad: p.cantidad, kg, dueno, motivo, exacto, causa, calidad: p.calidad, calibres: der?.calibres ?? [], gatesCalibre: der?.gatesCalibre ?? {} }
     out.porPieza.push(pieza)
     out.pz += p.cantidad
     out.kg += kg

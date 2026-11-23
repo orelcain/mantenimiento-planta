@@ -82,10 +82,42 @@ export class SeteoInferido {
   }
 }
 
+/** Lo que se deriva de una pieza de Gate 0 con el seteo inferido (lo usan las causas, el árbol y las acciones). */
+export interface DerivadoP0 {
+  causa: CausaP0
+  /** Calibres en que cabe por peso (dos en la zona 4.585–4.995 g; ninguno bajo 900 g). */
+  calibres: string[]
+  /** Gates que en ese momento tenían alguno de esos calibres (cualquier calidad), por calibre. */
+  gatesCalibre: Record<string, number[]>
+}
+
 /**
- * Causa derivada de cada pieza de Gate 0 con el seteo inferido, por su peso y su calidad (Gate 0 trae siempre
- * CONGELADO · DESTINO FILETE: conservación y producto no se pueden derivar). En orden: sin gate para su peso →
- * calidad D → calidad sin gate → tenía gate (la causa física llega con Puerta 0).
+ * Causa derivada de una pieza de Gate 0, por su peso y su calidad. En orden: sin gate para su peso → calidad D →
+ * calidad sin gate → tenía gate (la causa física llega con Puerta 0). `null` sin peso.
+ */
+export function derivarP0(z: PiezaEspejo, seteo: SeteoInferido, gates = seteo.gates()): DerivadoP0 | null {
+  const w = gramos(z)
+  if (!(w > 10)) return null
+  const t = ms(z)
+  const cals = Object.entries(RANGO_CALIBRE_G).filter(([, [a, b]]) => w >= a && w < b).map(([c]) => c)
+  const conCal: Array<{ gate: number; p: Etiqueta }> = []
+  for (const g of gates) {
+    const p = seteo.programa(g, t)
+    if (p && cals.includes(p.calibre)) conCal.push({ gate: g, p })
+  }
+  const gatesCalibre: Record<string, number[]> = {}
+  for (const x of conCal) (gatesCalibre[x.p.calibre] ??= []).push(x.gate)
+  const causa: CausaP0 = conCal.length === 0
+    ? 'sin-gate-peso'
+    : conCal.some((x) => x.p.calidad === z.calidad)
+      ? 'tenia-gate'
+      : z.calidad === 'D' ? 'calidad-d' : 'calidad-sin-gate'
+  return { causa, calibres: cals, gatesCalibre }
+}
+
+/**
+ * Causas derivadas de las piezas de Gate 0 con el seteo inferido (Gate 0 trae siempre CONGELADO · DESTINO FILETE:
+ * conservación y producto no se pueden derivar). Ver `derivarP0`.
  */
 export function causasP0Vivo(piezas: readonly PiezaEspejo[], seteo = new SeteoInferido(piezas)): CausasP0 {
   const out: CausasP0 = {
@@ -100,23 +132,16 @@ export function causasP0Vivo(piezas: readonly PiezaEspejo[], seteo = new SeteoIn
   for (const z of piezas) {
     if (z.gate !== 0) continue
     out.total += z.cantidad
-    const w = gramos(z)
-    if (!(w > 10)) { out.sinPeso += z.cantidad; continue }
-    const t = ms(z)
-    const progs = gates.map((g) => seteo.programa(g, t)).filter((p): p is Etiqueta => p !== null)
-    const cals = Object.entries(RANGO_CALIBRE_G).filter(([, [a, b]]) => w >= a && w < b).map(([c]) => c)
-    const conCal = progs.filter((p) => cals.includes(p.calibre))
-    if (conCal.length === 0) {
-      out.causas['sin-gate-peso'] += z.cantidad
-      if (cals.length === 0) out.pesoBajo += z.cantidad
-      else { const k = cals.join(' / '); out.pesoSinGate[k] = (out.pesoSinGate[k] ?? 0) + z.cantidad }
-      continue
+    const d = derivarP0(z, seteo, gates)
+    if (!d) { out.sinPeso += z.cantidad; continue }
+    out.causas[d.causa] += z.cantidad
+    if (d.causa === 'sin-gate-peso') {
+      if (d.calibres.length === 0) out.pesoBajo += z.cantidad
+      else { const k = d.calibres.join(' / '); out.pesoSinGate[k] = (out.pesoSinGate[k] ?? 0) + z.cantidad }
+    } else if (d.causa === 'calidad-sin-gate') {
+      const k = `${d.calibres.join(' / ')} ${z.calidad}`
+      out.calidadSinGate[k] = (out.calidadSinGate[k] ?? 0) + z.cantidad
     }
-    if (conCal.some((p) => p.calidad === z.calidad)) { out.causas['tenia-gate'] += z.cantidad; continue }
-    if (z.calidad === 'D') { out.causas['calidad-d'] += z.cantidad; continue }
-    out.causas['calidad-sin-gate'] += z.cantidad
-    const k = `${cals.join(' / ')} ${z.calidad}`
-    out.calidadSinGate[k] = (out.calidadSinGate[k] ?? 0) + z.cantidad
   }
   return out
 }

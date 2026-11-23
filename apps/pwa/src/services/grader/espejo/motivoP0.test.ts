@@ -30,6 +30,9 @@ const p0 = (min: number, dueno: PiezaP0['dueno'], cantidad = 1): PiezaP0 => ({
   motivo: null,
   exacto: false,
   causa: null,
+  calidad: 'Premium',
+  calibres: [],
+  gatesCalibre: {},
 })
 
 describe('cruzarPuerta0', () => {

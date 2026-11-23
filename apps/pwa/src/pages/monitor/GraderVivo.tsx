@@ -16,6 +16,7 @@ import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/grade
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { Tarjeta } from './TarjetaVivo'
 import { CuantoLlevamos } from './CuantoLlevamos'
+import { HayQueHacerAlgo } from './HayQueHacerAlgo'
 import { cuentaDelTurno } from './cuantoLlevamosDatos'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
@@ -604,9 +605,10 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
   const ultimaHora = d.serie.ultimaTs ? d.serie.ultimaTs.slice(11, 16) : null
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
-      <div className="grid gap-3 lg:grid-cols-[2fr_3fr]">
+      <div className="grid gap-3 lg:grid-cols-3">
         <Alertas d={d} ultimaHora={ultimaHora} />
         <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
+        {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} />}
       </div>
       <Curva d={d} />
       {d.pesca?.seteo && (
