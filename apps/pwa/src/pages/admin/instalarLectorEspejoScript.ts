@@ -1,10 +1,10 @@
 /**
- * Instalador del lector del espejo del grader (e1.8) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la sesión despierta desde el propio lector (y la devuelve al salir), abre Matrix si no corre y rellena solo los huecos del espejo dentro del rango que muestra Matrix (acciona solo la casilla «Limitar» y «Actualizar»).
+ * Instalador del lector del espejo del grader (e1.9) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la sesión despierta desde el propio lector (y la devuelve al salir), abre Matrix si no corre y rellena solo los huecos del espejo dentro del rango que muestra Matrix; con el archivo PERIODO elige una vez un periodo relativo del informe (acciona solo la casilla «Limitar», «Actualizar» y, encendido, la opción de periodo).
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader (e1.8). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Instalador del lector del espejo del grader (e1.9). Pegar TODO en PowerShell y Enter. Un solo pegado.
   # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
   # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
   # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
@@ -95,7 +95,9 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 #   1. las 2 fechas del rango (ValuePattern.SetValue): inicio = última pieza enviada - 10 min (o 00:00 de hoy),
 #      fin = mañana 00:00; nunca más atrás que el corte por antigüedad;
 #   2. la casilla «Limitar el informe…» (TogglePattern.Toggle), solo para desmarcarla;
-#   3. el botón «Actualizar» (InvokePattern.Invoke).
+#   3. el botón «Actualizar» (InvokePattern.Invoke);
+#   4. e1.9, solo con el archivo <dir>\\PERIODO: la opción del combo de periodo (SelectionItemPattern.Select), una vez por
+#      archivo, sin desplegar el combo.
 # Si no encuentra EXACTAMENTE 2 fechas editables y 1 casilla «Limitar el informe», no toca ni el rango ni la casilla.
 # Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
 # e1.5: la casilla se revisa en cada «Actualizar» aunque las fechas fallen. Matrix (Qt) ignora la escritura de sus
@@ -142,7 +144,18 @@ $ErrorActionPreference = 'Continue'
 #     «no-pedida:<sin-tipo|rechazo|error>» (el detalle va al log una vez). Un tipo que ya existe no es error.
 #   · Al salir limpio (DETENER, versión nueva, fin) devuelve el equipo a lo normal (solo ES_CONTINUOUS).
 
-$VERSION = 'e1.8'
+# e1.9 — periodo relativo del informe, APAGADO por defecto. Interruptor: el archivo <dir>\\PERIODO (vacío = la primera
+# opción conocida: últimas 24 h, último día, turno actual, hoy; con texto = esa opción exacta). Borrarlo lo apaga, pero
+# NO devuelve el combo a «Usuario definido»: eso se hace a mano en Matrix.
+#   · Siempre (aunque esté apagado) mira el combo de periodo solo leyendo: su valor y las opciones que expone cerrado.
+#   · Encendido elige una vez por archivo (marca en periodo-hecho.txt, sobrevive a reinicios), nunca durante una
+#     recarga ni con la sesión bloqueada, y no elige si ya está en esa opción. Nunca despliega el combo ni teclea.
+#     Probado el 23-11 contra Qt 5.15 y 6.12 de prueba: Select sobre la opción NO cambia un QComboBox; lo esperable en
+#     planta es «no-cambia», y entonces la opción se elige a mano una vez.
+#   · Con el informe fuera de «Usuario definido» (elegido por el lector o a mano) no escribe las fechas; si quedan de solo
+#     lectura igual desmarca «Limitar». Tras un cambio de periodo re-ancla por contenido.
+#   · Latido: clave «periodo» (24 de 24): «<estado>[:<opción>] valor=<valor> ops=<opciones>», tope 200.
+$VERSION = 'e1.9'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -199,6 +212,9 @@ $archivoLlave = Join-Path $dir 'llave.dat'
 # e1.6: orden de recarga de historia y el ancla propia de esa recarga.
 $archivoRecarga = Join-Path $dir 'RECARGA'
 $archivoRecargaEstado = Join-Path $dir 'recarga.json'
+# e1.9: interruptor del periodo relativo y la marca de que ya se resolvió con ese archivo.
+$archivoPeriodo = Join-Path $dir 'PERIODO'
+$archivoPeriodoHecho = Join-Path $dir 'periodo-hecho.txt'
 # E1.3: el vigilante (tarea programada) lee latido.txt y lector.pid; REVOCADA le dice que borre la tarea;
 # lector-nuevo.ps1 + nuevo.json son una versión ya bajada y verificada que el vigilante pone en marcha.
 $archivoLatido = Join-Path $dir 'latido.txt'
@@ -444,7 +460,8 @@ function Controles-Rango($ventana) {
   $d = $acc.campos[0]
   $h = $acc.campos[1]
   if ([string]::CompareOrdinal([string]$d.val, [string]$h.val) -gt 0) { return $r }
-  if ($d.soloLectura -or $h.soloLectura) { $r.error = 'solo-lectura'; return $r }
+  # e1.9: con las fechas de solo lectura (p. ej. un periodo relativo) la casilla igual se entrega para desmarcarla.
+  if ($d.soloLectura -or $h.soloLectura) { $r.error = 'solo-lectura'; $r.casilla = $lim[0]; return $r }
   $r.error = ''
   $r.desde = $d
   $r.hasta = $h
@@ -487,7 +504,9 @@ function Rango-Deseado($estado) {
 # e1.6: $soloCasilla (recarga de historia) no toca las fechas: el rango lo puso Orel a mano.
 function Ajusta-Rango($el, $estado, [bool]$soloCasilla = $false) {
   $ctl = Controles-Rango (Ventana-Raiz $el)
-  if ($ctl.error) { $script:ajuste = $ctl.error; return $null }
+  if ($ctl.error -and -not ($ctl.error -eq 'solo-lectura' -and $ctl.casilla)) { $script:ajuste = $ctl.error; return $null }
+  # e1.9: fechas de solo lectura o informe fuera de «Usuario definido»: solo la casilla, nunca las fechas.
+  if ($ctl.error -or $script:periodoRelativo) { $soloCasilla = $true }
   $toco = $false
   $script:casillaFalla = $false
   if ((Estado-Casilla $ctl.casilla.el) -eq 'On') {
@@ -499,6 +518,7 @@ function Ajusta-Rango($el, $estado, [bool]$soloCasilla = $false) {
   $q = Rango-Deseado $estado
   if (-not $script:fechasApagadas -and -not $soloCasilla) { $movio = Mueve-Fechas $ctl $q }
   $script:ajuste = Texto-Ajuste
+  if ($ctl.error -and $script:ajuste -eq 'ok') { $script:ajuste = $ctl.error }
   if (-not $toco -and -not $movio) { return $null }
   return @{ ctl = $ctl; orig = $script:rangoOriginal; q = $q; movio = $movio }
 }
@@ -850,10 +870,13 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
   # Un ciclo de puesta al día (la lectura anterior quedó a medias) no pulsa «Actualizar» ni espera la recarga,
   # y tampoco mueve el rango.
   $aj = $null
+  $cambioPer = $false
   if ($refrescar) {
     $boton = Boton-Actualizar (Ventana-De $foto.el)
     if (-not $boton) { $res.error = 'sin-boton'; return $res }
     # Con la sesión bloqueada no se mueve el rango ni la casilla. e1.5: un fallo de las fechas ya no apaga la casilla.
+    # e1.9: mira el combo de periodo y, solo con el archivo PERIODO, elige una vez (nunca en recarga ni con bloqueo).
+    try { $cambioPer = [bool](@(Paso-Periodo $foto.el $recarga ([bool]$script:bloqueada)) | Select-Object -Last 1) } catch { if ([string]$_.Exception.Message -eq 'DETENER') { throw }; Log ('periodo: error ' + $_.Exception.Message) }
     if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }
     try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     catch { $res.error = 'invoke-fallo'; return $res }
@@ -882,7 +905,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
       continue
     }
     # Con el rango corto la tabla puede quedar vacía de verdad: entonces 0 filas también vale como estable.
-    if ($n -eq $ult -and ($n -gt 0 -or $aj -or $recarga)) { $iguales++ } else { $iguales = 1; $ult = $n }
+    if ($n -eq $ult -and ($n -gt 0 -or $aj -or $recarga -or $cambioPer)) { $iguales++ } else { $iguales = 1; $ult = $n }
     if ($iguales -ge 3) { break }
     if ($t0.Elapsed.TotalSeconds -gt 120) { $res.error = 'tabla-inestable'; return $res }
     Espera 2
@@ -893,7 +916,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
   # e1.6: con «Limitar» marcada el informe se corta en 10 000 filas: una recarga así daría un día por completo sin
   # estarlo. No lee; la recarga sigue pendiente hasta que la casilla quede desmarcada.
   if ($recarga -and $foto.limite) { $res.error = 'recarga-con-limite'; return $res }
-  if ($aj -or $reanclar) {
+  if ($aj -or $reanclar -or $cambioPer) {
     $ra = Re-Ancla $foto.gp $n $estado
     $res.reancla = $ra
     Log ('reancla=' + $ra)
@@ -906,7 +929,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
     $foto = Foto
     if ($foto.error) { $res.error = $foto.error; return $res }
     $n = [int]$foto.gp.Current.RowCount
-    if ($aj -or $reanclar) { [void](Re-Ancla $foto.gp $n $estado) }
+    if ($aj -or $reanclar -or $cambioPer) { [void](Re-Ancla $foto.gp $n $estado) }
     $lec = Lee-Tabla $foto.gp $n $estado $reloj $recarga
     if (-not $lec) { $res.error = 'tabla-cambio'; return $res }
   }
@@ -920,6 +943,150 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
   $res.gp = $foto.gp
   $res.base = $(if ($lec.relectura) { 0 } else { $estado.piezas })
   return $res
+}
+
+# ---- e1.9: periodo relativo del informe (interruptor = archivo PERIODO; apagado si no existe) ----
+# Texto comparable: minúsculas, sin tildes y con un solo espacio.
+function Normaliza-Texto([string]$s) {
+  if (-not $s) { return '' }
+  $d = $s.Normalize([Text.NormalizationForm]::FormD)
+  $sb = New-Object System.Text.StringBuilder
+  foreach ($ch in $d.ToCharArray()) { if ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne [Globalization.UnicodeCategory]::NonSpacingMark) { [void]$sb.Append($ch) } }
+  return (($sb.ToString().ToLowerInvariant() -replace '\\s+', ' ').Trim())
+}
+
+# Opciones que el lector sabe elegir, en orden de preferencia (ventana móvil primero; nunca semana, mes ni ayer).
+$PERIODO_SINONIMOS = @(
+  '^(ultimas?|last|past) 24 ?(horas?|hours?|hrs?|h)$',
+  '^(ultimo|last|past) (dia|day)$',
+  '^(turno actual|turno en curso|current shift|this shift|turno|shift)$',
+  '^(hoy|today)$'
+)
+$PERIODO_MANUAL = '^(usuario definido|definido por el usuario|user defined|user-defined|custom|personalizado)$'
+
+# Combo de periodo de la ventana: el único ComboBox cuyo valor u opciones son «Usuario definido» o una opción conocida.
+# Solo lee: valor (ValuePattern) y opciones que el combo expone CERRADO (Qt 5 las expone; nunca se despliega).
+function Combo-Periodo($ventana) {
+  $r = @{ error = 'sin-combo'; el = $null; valor = ''; items = @(); nombres = [string[]]@() }
+  if (-not $ventana) { return $r }
+  $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ComboBox)
+  $condItem = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
+  $hallados = New-Object System.Collections.Generic.List[object]
+  foreach ($cb in @($ventana.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond))) {
+    $valor = Valor-De $cb
+    $items = @()
+    try { $items = @($cb.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condItem)) } catch { }
+    $nombres = [string[]]@($items | ForEach-Object { try { [string]$_.Current.Name } catch { '' } })
+    $todos = @($valor) + $nombres
+    $es = $false
+    foreach ($t in $todos) {
+      $n = Normaliza-Texto $t
+      if ($n -match $PERIODO_MANUAL) { $es = $true; break }
+      foreach ($re in $PERIODO_SINONIMOS) { if ($n -match $re) { $es = $true; break } }
+      if ($es) { break }
+    }
+    if ($es) { $hallados.Add(@{ el = $cb; valor = $valor; items = $items; nombres = $nombres }) }
+  }
+  if ($hallados.Count -gt 1) { $r.error = 'varios'; return $r }
+  if ($hallados.Count -eq 0) { return $r }
+  $h = $hallados[0]
+  $r.error = ''; $r.el = $h.el; $r.valor = $h.valor; $r.items = $h.items; $r.nombres = $h.nombres
+  return $r
+}
+
+# Índice de la opción a elegir: la que nombra el archivo PERIODO (texto exacto, sin importar tildes ni mayúsculas) o la
+# primera de la lista de sinónimos. -1 si ninguna sirve.
+function Elige-Periodo([string[]]$nombres, [string]$pedido) {
+  $p = Normaliza-Texto $pedido
+  if ($p) {
+    for ($i = 0; $i -lt $nombres.Count; $i++) { if ((Normaliza-Texto $nombres[$i]) -eq $p) { return $i } }
+    return -1
+  }
+  foreach ($re in $PERIODO_SINONIMOS) {
+    for ($i = 0; $i -lt $nombres.Count; $i++) { if ((Normaliza-Texto $nombres[$i]) -match $re) { return $i } }
+  }
+  return -1
+}
+
+# Clave «periodo» del latido (tope 200: la función rechaza el envío ENTERO si se pasa).
+# «<estado>[:<opción>] valor=<valor> ops=<a;b;…>»; estado: apagado | sin-combo | varios | sin-opciones | sin-coincidencia
+# | ya-en | elegida | no-cambia | error | pospuesto-recarga | pospuesto-bloqueo.
+function Texto-Periodo([string]$estado, [string]$opcion, [string]$valor, [string[]]$nombres) {
+  $limpia = { param($x) (([string]$x) -replace '[\\s;=]+', ' ').Trim() }
+  $t = $estado
+  if ($opcion) { $t += ':' + (& $limpia $opcion) }
+  $t += ' valor=' + (& $limpia $valor)
+  if ($nombres -and $nombres.Count) { $t += ' ops=' + ((@($nombres | ForEach-Object { & $limpia $_ }) | Where-Object { $_ }) -join ';') }
+  if ($t.Length -gt 200) { $t = $t.Substring(0, 197) + '...' }
+  return $t
+}
+
+# Marca del archivo PERIODO (hora de escritura) y su contenido (opción pedida, opcional).
+function Marca-Periodo {
+  try {
+    if (-not (Test-Path -LiteralPath $archivoPeriodo)) { return '' }
+    return [string](Get-Item -LiteralPath $archivoPeriodo).LastWriteTimeUtc.Ticks
+  } catch { return '' }
+}
+function Pedido-Periodo {
+  try { return ([IO.File]::ReadAllText($archivoPeriodo)).Trim() } catch { return '' }
+}
+
+# Antes de «Actualizar». Siempre mira el combo (solo lectura) para el latido y para no mover las fechas si el informe ya
+# no está en «Usuario definido». Con el archivo PERIODO, y una sola vez por archivo (la marca queda en periodo-hecho.txt,
+# así un reinicio del lector no vuelve a elegir): si el combo está cerrado y expone sus opciones, elige por UIA
+# (SelectionItemPattern.Select) la opción pedida o la primera conocida. Nunca despliega el combo, no teclea, no elige
+# durante una recarga ni con la sesión bloqueada, y no elige si ya está en la opción correcta.
+# Devuelve $true solo si el valor del combo cambió (el ciclo re-ancla).
+function Paso-Periodo($el, [bool]$recarga, [bool]$bloqueada) {
+  $obs = Combo-Periodo (Ventana-Raiz $el)
+  $vNorm = Normaliza-Texto $obs.valor
+  $script:periodoRelativo = ((-not $obs.error) -and $vNorm -and ($vNorm -notmatch $PERIODO_MANUAL))
+  $marca = Marca-Periodo
+  if (-not $marca) {
+    $script:periodoTexto = Texto-Periodo $(if ($obs.error) { $obs.error } else { 'apagado' }) '' $obs.valor $obs.nombres
+    return $false
+  }
+  $hecho = ''
+  try { $hecho = ([IO.File]::ReadAllText($archivoPeriodoHecho)).Trim() } catch { }
+  $partes = $hecho.Split("\`t")
+  if ($partes[0] -eq $marca) {
+    # Ya se resolvió con este archivo: se informa el resultado guardado y el valor de ahora.
+    $script:periodoTexto = Texto-Periodo $(if ($partes.Count -gt 1) { $partes[1] } else { 'hecho' }) $(if ($partes.Count -gt 2) { $partes[2] } else { '' }) $obs.valor $obs.nombres
+    return $false
+  }
+  if ($recarga) { $script:periodoTexto = Texto-Periodo 'pospuesto-recarga' '' $obs.valor $obs.nombres; return $false }
+  if ($bloqueada) { $script:periodoTexto = Texto-Periodo 'pospuesto-bloqueo' '' $obs.valor $obs.nombres; return $false }
+  if ($obs.error) { $script:periodoTexto = Texto-Periodo $obs.error '' $obs.valor $obs.nombres; return $false }
+  $resultado = ''
+  $opcion = ''
+  $cambio = $false
+  if ($obs.nombres.Count -eq 0) { $resultado = 'sin-opciones' }
+  else {
+    $i = Elige-Periodo $obs.nombres (Pedido-Periodo)
+    if ($i -lt 0) { $resultado = 'sin-coincidencia' }
+    else {
+      $opcion = [string]$obs.nombres[$i]
+      if ($vNorm -eq (Normaliza-Texto $opcion)) { $resultado = 'ya-en' }
+      else {
+        try {
+          $obs.items[$i].GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+          Espera 2
+          $ahora = Valor-De $obs.el
+          if ((Normaliza-Texto $ahora) -eq (Normaliza-Texto $opcion)) { $resultado = 'elegida'; $cambio = $true; $obs.valor = $ahora; $script:periodoRelativo = $true }
+          else { $resultado = 'no-cambia'; $obs.valor = $ahora }
+        } catch {
+          if ([string]$_.Exception.Message -eq 'DETENER') { throw }
+          $resultado = 'error'
+          Log ('periodo: error al elegir «' + $opcion + '»: ' + $_.Exception.Message)
+        }
+      }
+    }
+  }
+  try { [IO.File]::WriteAllText($archivoPeriodoHecho, ($marca + "\`t" + $resultado + "\`t" + $opcion), $UTF8) } catch { }
+  $script:periodoTexto = Texto-Periodo $resultado $opcion $obs.valor $obs.nombres
+  Log ('periodo: ' + $script:periodoTexto)
+  return $cambio
 }
 
 # Sesión de Windows bloqueada: LogonUI corre mientras se muestra la pantalla de bloqueo.
@@ -1354,6 +1521,9 @@ $script:recarga = $null
 $script:recargaCierre = ''
 $script:recargaHecha = ''
 $script:reanclar = $false
+# e1.9: clave «periodo» del latido y si el informe está fuera de «Usuario definido» (entonces no se escriben fechas).
+$script:periodoTexto = ''
+$script:periodoRelativo = $false
 try { [IO.File]::WriteAllText($archivoPid, [string]$PID, $UTF8) } catch { }
 $script:arranque = Modo-Arranque
 $script:actualiz = ''
@@ -1366,7 +1536,7 @@ Log ('Arranque ' + $VERSION + ' (' + $script:arranque + '): equipo=' + $equipo +
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; recarga = ''; pantalla = (Texto-Pantalla $script:pantallaPedida (Sesion-Bloqueada) (Get-Date)); matrix = ''; huecos = ''; error = 'iniciando' }
+$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; recarga = ''; pantalla = (Texto-Pantalla $script:pantallaPedida (Sesion-Bloqueada) (Get-Date)); matrix = ''; huecos = ''; periodo = ''; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
 Escribe-Latido 'inicio'
@@ -1449,7 +1619,7 @@ while (-not $terminar) {
     $latPiezas = $estado.piezas; $latPrimera = $estado.primera; $latUltima = $estado.ultima; $latParcial = $true
     if ($res.lec) { $rec.avance = [int]$res.lec.hastaIdx + 1; $rec.total = [int]$res.ftabla }
   }
-  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$latPiezas; primera = $latPrimera; ultima = $latUltima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = $latParcial; vivo = (Texto-Vivo); recarga = (Texto-Recarga $rec $script:recargaCierre $(if ($rec) { [int]$rec.avance } else { 0 }) $(if ($rec) { [int]$rec.total } else { 0 }) ([string]$res.error)); pantalla = (Texto-Pantalla $script:pantallaPedida $script:bloqueada (Get-Date)); matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos) }
+  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$latPiezas; primera = $latPrimera; ultima = $latUltima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = $latParcial; vivo = (Texto-Vivo); recarga = (Texto-Recarga $rec $script:recargaCierre $(if ($rec) { [int]$rec.avance } else { 0 }) $(if ($rec) { [int]$rec.total } else { 0 }) ([string]$res.error)); pantalla = (Texto-Pantalla $script:pantallaPedida $script:bloqueada (Get-Date)); matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos); periodo = [string]$script:periodoTexto }
 
   $enviadas = 0
   $fin = ''

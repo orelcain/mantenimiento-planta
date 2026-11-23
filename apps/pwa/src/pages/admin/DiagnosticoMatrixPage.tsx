@@ -309,7 +309,7 @@ export function DiagnosticoMatrixPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Revisa si Matrix se puede manejar sin mouse ni teclado, paso previo a exportar el informe de forma automática. La sonda solo lee: no pulsa ni cambia nada.
+            Revisa si Matrix se puede manejar sin mouse ni teclado, qué opciones trae el selector de periodo y cómo está el lector del espejo en este PC. La sonda solo lee: no pulsa ni cambia nada en Matrix.
           </p>
           <Button
             size="sm"
@@ -320,7 +320,7 @@ export function DiagnosticoMatrixPage() {
             Copiar sonda de solo lectura
           </Button>
           <p className="text-xs text-muted-foreground">
-            Pégala dos veces en PowerShell: una con «Pieza pieza Grader» en pantalla y otra con la ventana de exportar abierta, sin guardar. Cierra antes la pantalla de Administración. Saca foto al informe; el detalle queda en el Escritorio como sonda-matrix-HHmmss.txt.
+            Pégala en PowerShell con «Pieza pieza Grader» en pantalla y la pantalla de Administración cerrada. Al terminar, el resumen (sección 8) queda copiado: pégalo en el chat o sácale una foto. El detalle queda en el Escritorio como sonda-matrix-HHmmss.txt.
           </p>
         </CardContent>
       </Card>

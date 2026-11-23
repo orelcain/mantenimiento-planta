@@ -57,8 +57,32 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
 
   it('no teclea, selecciona, cierra ni mueve el foco en Matrix', () => {
     expect(S).not.toMatch(
-      /\.Select\(\)|\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|\.ScrollIntoView\(|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
+      /\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|\.ScrollIntoView\(|\.AddToSelection\(|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
     )
+  })
+
+  it('e1.9: elige el periodo con UNA sola llamada a Select, dentro de Paso-Periodo y solo con el archivo PERIODO', () => {
+    expect(S.match(/\.Select\(\)/g)?.length).toBe(1)
+    const i = S.indexOf('function Paso-Periodo(')
+    const f = S.indexOf('\n}\n', i)
+    const cuerpo = S.slice(i, f)
+    expect(cuerpo).toContain('.Select()')
+    // Sin archivo PERIODO sale antes de elegir; con recarga o bloqueo tampoco elige.
+    expect(cuerpo.indexOf('if (-not $marca) {')).toBeLessThan(cuerpo.indexOf('.Select()'))
+    expect(cuerpo.indexOf("if ($recarga) { $script:periodoTexto = Texto-Periodo 'pospuesto-recarga'")).toBeLessThan(cuerpo.indexOf('.Select()'))
+    expect(cuerpo.indexOf("if ($bloqueada) { $script:periodoTexto = Texto-Periodo 'pospuesto-bloqueo'")).toBeLessThan(cuerpo.indexOf('.Select()'))
+    // Una vez por archivo: la marca queda en periodo-hecho.txt y con la misma marca no vuelve a elegir.
+    expect(cuerpo).toContain('if ($partes[0] -eq $marca) {')
+    expect(cuerpo).toContain('[IO.File]::WriteAllText($archivoPeriodoHecho')
+    // Ya en la opción correcta: no elige.
+    expect(cuerpo).toContain("if ($vNorm -eq (Normaliza-Texto $opcion)) { $resultado = 'ya-en' }")
+    // Opciones solo del combo cerrado: nunca se despliega para leerlas.
+    expect(S).not.toMatch(/ExpandCollapsePattern/)
+  })
+
+  it('e1.9: con fechas de solo lectura o periodo relativo igual desmarca «Limitar» y no escribe fechas', () => {
+    expect(S).toContain("if ($d.soloLectura -or $h.soloLectura) { $r.error = 'solo-lectura'; $r.casilla = $lim[0]; return $r }")
+    expect(S).toContain("if ($ctl.error -or $script:periodoRelativo) { $soloCasilla = $true }")
   })
 
   it('e1.7: pide pantalla encendida y sin suspensión (ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED), sin simular entrada', () => {
@@ -84,8 +108,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).not.toMatch(/Stop-Process[^\n]*(matrix|marelec)|CloseMainWindow|taskkill/i)
   })
 
-  it('es la versión e1.8 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.8'"])
+  it('es la versión e1.9 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.9'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
@@ -96,7 +120,7 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(claves.length).toBeGreaterThan(15)
     expect(claves.length).toBeLessThanOrEqual(24)
     // e1.7: pantalla, Matrix abierto por el lector y huecos.
-    expect(linea).toContain('matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos) }')
+    expect(linea).toContain('matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos); periodo = [string]$script:periodoTexto }')
     // e1.4: la lectura en vivo a pedido se informa en la clave «vivo».
     expect(linea).toContain('vivo = (Texto-Vivo); recarga = (Texto-Recarga ')
   })

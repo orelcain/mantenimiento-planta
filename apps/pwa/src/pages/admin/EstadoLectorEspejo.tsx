@@ -19,6 +19,7 @@ import {
   fraseActualizacion,
   fraseDeError,
   fraseHuecos,
+  frasePeriodo,
   fraseMatrix,
   frasePantalla,
   fraseRecarga,
@@ -50,6 +51,8 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
   const pantalla = frasePantalla(est.pantalla)
   const matrix = fraseMatrix(est.matrix)
   const huecos = fraseHuecos(est.huecos)
+  // e1.9: combo de periodo del informe (interruptor = archivo PERIODO).
+  const periodo = frasePeriodo(est.periodo)
   // Durante una recarga el latido va «parcial» y el rango viejo es a propósito: ni «poniéndose al día» ni «mueve el
   // fin del rango». Al terminar, el aviso de la recarga ya pide volver el rango a hoy: no se repite.
   const enRecarga = est.recarga === 'con-limite' || Boolean(est.recarga?.startsWith('leyendo'))
@@ -90,6 +93,8 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
         {huecos && <Dato k="Huecos del espejo" v={huecos.texto} />}
         {matrix && <Dato k="Matrix" v={matrix.texto} />}
         {pantalla && <Dato k="Pantalla" v={pantalla.texto} />}
+        {periodo && <Dato k="Periodo del informe" v={periodo.texto} />}
+        {periodo && periodo.opciones.length > 0 && <Dato k="Opciones del periodo" v={periodo.opciones.join(' · ')} />}
         {typeof est.bloqueada === 'boolean' && (
           <Dato
             k="Sesión de Windows"
@@ -101,7 +106,7 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
         )}
         <Dato k="Error" v={est.error || 'ninguno'} />
       </dl>
-      {[error, limite, ajuste?.aviso ?? null, recarga?.aviso ?? null, huecos?.aviso ?? null, matrix?.aviso ?? null, pantalla?.aviso ?? null].filter(Boolean).map((t) => (
+      {[error, limite, ajuste?.aviso ?? null, recarga?.aviso ?? null, huecos?.aviso ?? null, matrix?.aviso ?? null, pantalla?.aviso ?? null, periodo?.aviso ?? null].filter(Boolean).map((t) => (
         <p key={t!} className="text-xs text-ink-warn">{t}</p>
       ))}
       {avance && <p className="text-xs text-muted-foreground tabular-nums">{avance}</p>}
