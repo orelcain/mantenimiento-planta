@@ -133,9 +133,9 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
 
   const angosto = ancho > 0 && ancho < 480
   const alto = GEOM.arriba + (angosto ? GEOM.alto1Angosto : GEOM.alto1) + GEOM.hueco + GEOM.alto2 + 24 + GEOM.slider + 8
-  const sub = d.retraso.medido
+  const sub = (g.baader5 ? 'Baader cada 5 min (respaldo de Shoplogix, sin serie por minuto). ' : '') + (d.retraso.medido
     ? `Baader corridas ${g.retraso} min: lo que tarda una pieza en llegar al grader, medido en este turno (las curvas coinciden ${(d.retraso.r ?? 0) >= 0.8 ? 'bien' : 'a medias'}).`
-    : `Baader corridas ${g.retraso} min: lo que tarda una pieza en llegar al grader, según la ${RETRASO_REFERENCIA_FUENTE}.`
+    : `Baader corridas ${g.retraso} min: lo que tarda una pieza en llegar al grader, según la ${RETRASO_REFERENCIA_FUENTE}.`)
   const conDueno = g.porPieza !== null
 
   return (
@@ -172,7 +172,7 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
       )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] leading-[18px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-4 rounded-full" style={{ background: 'var(--v2-acento)' }} />Grader</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: 'var(--v2-gris)' }} />Baader</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: 'var(--v2-gris)' }} />{g.baader5 ? 'Baader (cada 5 min)' : 'Baader'}</span>
         {conDueno ? (
           <>
             <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--v2-mant)' }} />P0 Mantención</span>

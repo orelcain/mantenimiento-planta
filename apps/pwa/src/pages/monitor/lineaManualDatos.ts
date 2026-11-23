@@ -40,12 +40,14 @@ function minutoDeHora(t0Ms: number, hora: string): number {
 export function filasManual(horas: readonly HoraManual[], t0Ms: number, detenciones: ReadonlyArray<readonly [number, number]>, hastaMin: number, enCurso: boolean): FilaManual[] {
   const out: FilaManual[] = horas.map((h) => {
     if (h.diferencia === null) return { tipo: 'sinLectura', hora: h.hora }
+    // Con el respaldo de 5 min las Baader van en quintos de pieza: se redondea.
+    const dif = Math.round(h.diferencia)
     const a = minutoDeHora(t0Ms, h.hora)
     let det = 0
     for (const [x, y] of detenciones) det += Math.max(0, Math.min(y, a + 60) - Math.max(x, a))
-    if (det >= MANUAL_DETENIDA_MIN) return { tipo: 'detenida', hora: h.hora, d: h.diferencia }
-    if (h.diferencia <= 0) return { tipo: 'cero', hora: h.hora, d: h.diferencia }
-    return { tipo: 'barra', hora: h.hora, d: h.diferencia, pct: Math.max(BARRA_MIN_PCT, Math.min(100, (h.diferencia / TOPE_MANUAL_PZ) * 100)) }
+    if (det >= MANUAL_DETENIDA_MIN) return { tipo: 'detenida', hora: h.hora, d: dif }
+    if (dif <= 0) return { tipo: 'cero', hora: h.hora, d: dif }
+    return { tipo: 'barra', hora: h.hora, d: dif, pct: Math.max(BARRA_MIN_PCT, Math.min(100, (dif / TOPE_MANUAL_PZ) * 100)) }
   })
   if (enCurso) {
     const ult = horas[horas.length - 1]

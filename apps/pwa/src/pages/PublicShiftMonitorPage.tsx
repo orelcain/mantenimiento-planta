@@ -8077,6 +8077,7 @@ function MonitorDelToken() {
             <Suspense fallback={<div className="h-[188px] w-full animate-pulse rounded-card bg-muted" />}>
               <PestanaGraderMonitor
                 baader={serieMinutoVista ?? null}
+                baaderCada5={live.series}
                 paradas={paradasGrader}
                 lineId={lineaMonitor.id}
                 dateKey={vista?.dateKey || data.dateKey || null}

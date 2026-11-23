@@ -7,7 +7,7 @@
  * cierre, cortado a la hora que se elija, sin Firestore ni login. Por defecto trae el hueco REAL del espejo
  * (23:39:26 → 00:28:51: sin piezas leídas mientras las Baader seguían).
  *
- * `?sinHueco=1`: el turno completo. `?p0=0`: sin Puerta 0 (el motivo queda «estimado»). `?publico=1`: la vista de
+ * `?sinHueco=1`: el turno completo. `?b5=1`: las Baader del respaldo de 5 min (sin serie por minuto). `?p0=0`: sin Puerta 0 (el motivo queda «estimado»). `?publico=1`: la vista de
  * quien no es admin.
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -15,7 +15,7 @@ import urlPiezas from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-
 import extra from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-18-turno_1-extra.json'
 import resumenes from '@/services/grader/espejo/__fixtures__/chonchi-resumenes-16-al-18-11.json'
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
-import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import { serieDesdeCada5, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
 import type { CalibreRange, GraderDailySummary } from '@/services/grader/types'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import '@/pages/monitor/monitorGlass.css'
@@ -54,6 +54,14 @@ const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search)
 const HUECO: [string, string] | null = Q.has('sinHueco') ? null : ['2026-11-18T23:39:26', '2026-11-19T00:28:51']
 const CON_P0 = Q.get('p0') !== '0'
 const PUBLICO = Q.has('publico')
+const B5 = Q.has('b5')
+
+/** Las cubetas de 5 min de las 3 Baader sumadas (`extra.b5`, intervals de Shoplogix). */
+const CUBETAS_B5: Array<{ t: string; pieces: number }> = (() => {
+  const m = new Map<string, number>()
+  for (const maq of extra.b5) for (const iv of maq.intervals) m.set(iv.s, (m.get(iv.s) ?? 0) + iv.c)
+  return [...m.entries()].map(([t, pieces]) => ({ t, pieces }))
+})()
 
 const PARADAS: ParadaGrader[] = extra.paradas.map((p) => ({
   desdeMs: Date.parse(p.desde),
@@ -114,6 +122,8 @@ export default function GraderVivoDevPage() {
   // Shoplogix publica los minutos con unos 3 min de atraso.
   const baader = useMemo(() => {
     if (!turno) return null
+    // `?b5=1`: el respaldo de 5 min de Shoplogix (cubetas cerradas de las 3 Baader), como si faltara la serie por minuto.
+    if (B5) return serieDesdeCada5(CUBETAS_B5, T0 + (hasta - 3) * 60_000)
     const n = Math.max(0, Math.floor((T0 + hasta * 60_000 - Date.parse(turno.baader.desde)) / 60_000) - 3)
     return { desde: turno.baader.desde, maquinas: turno.baader.maquinas.map((m) => ({ cycles: m.cycles.slice(0, n) })) }
   }, [turno, hasta])
@@ -140,6 +150,7 @@ export default function GraderVivoDevPage() {
           inicioMs={T0}
           finMs={FIN}
           baader={baader}
+          baaderCada5={B5}
           paradas={PARADAS}
           minutosSinLatido={1}
           turnoEnCurso

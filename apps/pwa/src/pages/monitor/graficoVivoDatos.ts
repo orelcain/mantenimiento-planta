@@ -263,7 +263,7 @@ export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
     sinP0: d.totales.p0 === null,
     lotes: franjaLotes(d.lotes),
     manual: tramosManual(grader, baader),
-    baader5: false,
+    baader5: d.baader5,
   }
 }
 

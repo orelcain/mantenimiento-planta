@@ -157,6 +157,8 @@ export interface EntradaGraderVivo {
   inicioMs: number
   finMs: number
   baader: SerieMinutoBaader | null
+  /** La serie de las Baader es el respaldo de 5 min de Shoplogix (`serieDesdeCada5`), no la de por minuto. */
+  baaderCada5?: boolean
   paradas: readonly ParadaGrader[]
   minutosSinLatido: number | null
   turnoEnCurso: boolean
@@ -209,6 +211,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     retraso,
     alertas: pesca ? [...alertas, ...pesca.avisos].sort((a, b) => (a.nivel === b.nivel ? a.desdeMin - b.desdeMin : a.nivel === 'mal' ? -1 : 1)) : alertas,
     pesca,
+    /** Las Baader vienen cada 5 min (respaldo): el subtítulo del gráfico y la línea manual lo dicen. */
+    baader5: !!e.baaderCada5 && baader !== null,
     /** Filas de «Lotes del turno» (con el hueco del espejo entre dos lotes); `[]` sin piezas. */
     lotes: pesca ? filasLotes(pesca.lotes, serie.t0Ms, huecos(sinLectura, serie.hastaMin), e.turnoEnCurso) : [],
     totales: totalesDelTurno(serie),

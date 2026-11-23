@@ -15,7 +15,7 @@ import { MANUAL_EXCESO_PZ_MIN, MANUAL_TRAMO_MIN, TOPE_MANUAL_PZ, filasManual, ho
 
 const IC = 'h-3.5 w-3.5'
 
-export function LineaManual({ d, enCurso, baader5 = false }: { d: DatosGraderVivo; enCurso: boolean; baader5?: boolean }) {
+export function LineaManual({ d, enCurso }: { d: DatosGraderVivo; enCurso: boolean }) {
   const hasta = d.serie.hastaMin
   const { filas, tramos, neto } = useMemo(() => {
     const ej = seriesEje(d)
@@ -52,7 +52,7 @@ export function LineaManual({ d, enCurso, baader5 = false }: { d: DatosGraderViv
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <p className="text-[12px] leading-4 text-muted-foreground">Entrada manual estimada</p>
-            <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold leading-4" style={{ background: 'var(--v2-reja)', color: 'var(--v2-atento-texto)' }}>señal débil</span>
+            <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold leading-4" style={{ background: 'var(--v2-reja)', color: 'var(--v2-atento-texto)' }}>{d.baader5 ? 'señal débil · Baader cada 5 min' : 'señal débil'}</span>
           </div>
           <p className="mt-1 text-[17px] font-semibold leading-6 text-foreground tabular-nums" data-testid="manual-tramos">
             {r.n === 0 ? 'Sin tramos' : `${r.n} ${r.n === 1 ? 'tramo' : 'tramos'} · ${horasMin(r.min)} · ≈ ${milesPunto(r.pz)} pz`}
@@ -78,7 +78,7 @@ export function LineaManual({ d, enCurso, baader5 = false }: { d: DatosGraderViv
             Horario estimado: exceso = grader − Baader corridas {d.retraso.min} min. Un tramo es «entrada manual» si el exceso pasa de {MANUAL_EXCESO_PZ_MIN} pz/min por {MANUAL_TRAMO_MIN} min
             seguidos (ilustrativo). Mide cuándo entran las piezas al grader, no cuándo se trabajaron en la línea manual.
           </li>
-          {baader5 && <li>Las Baader vienen cada 5 min (respaldo de Shoplogix): el exceso por minuto sale grueso.</li>}
+          {d.baader5 && <li>Las Baader vienen cada 5 min (respaldo de Shoplogix): el exceso por minuto sale grueso.</li>}
         </ul>
       </details>
     </Tarjeta>
