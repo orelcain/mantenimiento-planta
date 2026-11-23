@@ -84,11 +84,11 @@ test('Espera-Ciclo: 60 s mientras dura el plazo, ESPEJO_CADA fuera de él; nunca
 })
 
 test('el lector usa Espera-Ciclo para esperar, informa «vivo» en el latido y es e1.8', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.8'$/m)
+  assert.match(LECTOR, /^\$VERSION = 'e1\.9'$/m)
   assert.match(LECTOR, /^\$ESPERA_VIVO = 60$/m)
   assert.ok(LECTOR.includes('  $espera = Espera-Ciclo $cada $script:vivoFin (Get-Date)\n'))
   assert.ok(LECTOR.includes('parcial = $latParcial; vivo = (Texto-Vivo); recarga = '))
-  assert.ok(LECTOR.includes("relectura = $false; vivo = ''; recarga = ''; pantalla = (Texto-Pantalla $script:pantallaPedida (Sesion-Bloqueada) (Get-Date)); matrix = ''; huecos = ''; error = 'iniciando' }"))
+  assert.ok(LECTOR.includes("relectura = $false; vivo = ''; recarga = ''; pantalla = (Texto-Pantalla $script:pantallaPedida (Sesion-Bloqueada) (Get-Date)); matrix = ''; huecos = ''; periodo = ''; error = 'iniciando' }"))
   // La respuesta de cada 200 decide el modo; sin vivoSeg vuelve a ESPEJO_CADA.
   assert.ok(LECTOR.includes('    $script:vivoFin = $null\n    if ($jr) { try { $script:vivoFin = Fin-Vivo $jr.vivoSeg (Get-Date) }'))
 })

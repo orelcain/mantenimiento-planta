@@ -46,7 +46,7 @@ function correr(guion) {
 }
 
 test('el lector es e1.8 y la recarga tiene sus archivos aparte del estado normal', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.8'$/m)
+  assert.match(LECTOR, /^\$VERSION = 'e1\.9'$/m)
   assert.ok(LECTOR.includes("$archivoRecarga = Join-Path $dir 'RECARGA'"))
   assert.ok(LECTOR.includes("$archivoRecargaEstado = Join-Path $dir 'recarga.json'"))
   // Los envíos de la recarga avanzan SU ancla, en recarga.json; estado.json no se toca.
@@ -134,7 +134,7 @@ test('el bucle: recarga sin fechas, sin actualización a medias, con re-anclaje 
   // Con «Limitar» marcada no lee (un día cortado en 10 000 filas se vería completo).
   assert.ok(LECTOR.includes("if ($recarga -and $foto.limite) { $res.error = 'recarga-con-limite'; return $res }"))
   // Re-anclaje por contenido también sin $aj (al volver de una recarga).
-  assert.ok(LECTOR.includes('if ($aj -or $reanclar) {'))
+  assert.ok(LECTOR.includes('if ($aj -or $reanclar -or $cambioPer) {'))
   // No baja una versión nueva durante la recarga.
   assert.ok(LECTOR.includes('-or $script:recarga) { } else {\n    $ra = Revisa-Actualizacion'))
   // Al terminar borra la orden y su estado, y vuelve al modo normal con re-anclaje.

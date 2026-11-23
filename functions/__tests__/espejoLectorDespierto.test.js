@@ -85,7 +85,7 @@ test('sin el tipo: «no-pedida:sin-tipo» en la clave y el detalle una sola vez 
 })
 
 test('e1.8: banderas en decimal (en PS 5.1 el hex 0x80000003 es un Int32 negativo) y se devuelve al salir', () => {
-  assert.match(LECTOR, /^\$VERSION = 'e1\.8'$/m)
+  assert.match(LECTOR, /^\$VERSION = 'e1\.9'$/m)
   assert.ok(!/0x8000000[0-3]/i.test(LECTOR))
   assert.ok(LECTOR.includes('function Pide-Pantalla([uint32]$flags = 2147483651) {'))
   // Se pide al arrancar y en cada ciclo; al salir del bucle se devuelve antes del «Fin del lector».

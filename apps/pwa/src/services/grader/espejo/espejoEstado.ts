@@ -61,6 +61,12 @@ export interface EstadoLector {
      * «al-dia <n>h <desde> a <hasta>[ releidas N]», «sin-rango», «sin-conteos», «desordenada», «error» o ''.
      */
     huecos?: string
+    /**
+     * Desde e1.9: combo de periodo del informe. «<estado>[:<opción>] valor=<valor>[ ops=<a;b;…>]»; estado: apagado |
+     * sin-combo | varios | sin-opciones | sin-coincidencia | ya-en | elegida | no-cambia | error | pospuesto-recarga |
+     * pospuesto-bloqueo.
+     */
+    periodo?: string
   }
 }
 
@@ -423,3 +429,44 @@ export function fraseHuecos(huecos: string | undefined): { texto: string; aviso:
 
 /** Orden para el PC de planta: crea el archivo RECARGA en la carpeta del lector. */
 export const COMANDO_RECARGA = 'New-Item -ItemType File -Force "$env:LOCALAPPDATA\\espejo-grader\\RECARGA"'
+
+/** e1.9: qué hizo el lector con el combo de periodo (clave `periodo`). */
+const ESTADO_PERIODO: Record<string, string> = {
+  apagado: 'apagado',
+  'sin-combo': 'apagado o sin dato: no se halló el combo de periodo',
+  varios: 'sin elegir: hay más de un combo que parece de periodo',
+  'sin-opciones': 'sin elegir: el combo no muestra sus opciones cerrado',
+  'sin-coincidencia': 'sin elegir: ninguna opción conocida',
+  'ya-en': 'ya estaba en',
+  elegida: 'elegida por el lector:',
+  'no-cambia': 'Matrix no tomó la elección de',
+  error: 'error al elegir',
+  'pospuesto-recarga': 'esperando: hay una recarga en curso',
+  'pospuesto-bloqueo': 'esperando: la sesión está bloqueada',
+}
+
+/**
+ * e1.9: frase del periodo del informe (clave `periodo`: «<estado>[:<opción>] valor=<valor>[ ops=<a;b;…>]»).
+ * `aviso` cuando Matrix no tomó la elección (lo esperable con Qt: elegir a mano una vez) o el combo no se halló.
+ */
+export function frasePeriodo(periodo: string | undefined): { texto: string; aviso: string | null; opciones: string[] } | null {
+  if (!periodo) return null
+  const m = /^(\S+?)(?::(.*?))? valor=(.*?)(?: ops=(.*))?$/.exec(periodo)
+  if (!m) return { texto: periodo, aviso: null, opciones: [] }
+  const estado = m[1]!
+  const opcion = m[2] ?? ''
+  const valor = m[3] ?? ''
+  const opciones = (m[4] ?? '').split(';').filter(Boolean)
+  const base = ESTADO_PERIODO[estado] ?? estado
+  const texto = `${base}${opcion ? ` «${opcion}»` : ''} · informe en «${valor || '?'}»`
+  let aviso: string | null = null
+  if (estado === 'no-cambia') aviso = `Matrix no tomó la elección automática de «${opcion}» (Qt no acepta elegir sin teclado ni mouse). Si sirve, elígela a mano una vez en Matrix: el lector la respeta y no mueve las fechas.`
+  else if (estado === 'error') aviso = 'El lector no pudo elegir el periodo: el detalle está en lector.log del PC de planta.'
+  else if (estado === 'sin-coincidencia' || estado === 'sin-opciones') aviso = 'El lector no eligió nada. Si hay una opción relativa en la lista de Matrix, escríbela tal cual en el archivo PERIODO o elígela a mano.'
+  return { texto, aviso, opciones }
+}
+
+/** e1.9: enciende el periodo relativo (archivo PERIODO vacío = la primera opción conocida). */
+export const COMANDO_PERIODO_ENCENDER = 'New-Item -ItemType File -Force "$env:LOCALAPPDATA\\espejo-grader\\PERIODO"'
+/** e1.9: lo apaga. No devuelve el combo a «Usuario definido»: eso se hace a mano en Matrix. */
+export const COMANDO_PERIODO_APAGAR = 'Remove-Item -Force "$env:LOCALAPPDATA\\espejo-grader\\PERIODO"'

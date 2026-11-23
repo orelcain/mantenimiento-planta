@@ -26,7 +26,7 @@ import {
 } from '@/services/grader/espejo/espejoVersionLogica'
 import { INSTALAR_LECTOR_ESPEJO_PS1 } from './instalarLectorEspejoScript'
 import { COMANDO_REGISTRO_LECTOR, EstadoLectorEspejo } from './EstadoLectorEspejo'
-import { COMANDO_RECARGA } from '@/services/grader/espejo/espejoEstado'
+import { COMANDO_PERIODO_APAGAR, COMANDO_PERIODO_ENCENDER, COMANDO_RECARGA } from '@/services/grader/espejo/espejoEstado'
 
 const NOMBRE_POR_DEFECTO = 'PC Matrix'
 
@@ -303,6 +303,23 @@ export function LectorEspejoCard() {
           <p className="text-xs text-muted-foreground">
             Un día completo tarda unos 5 minutos y, mientras dura, el lector no lee el turno en curso: hazlo fuera de producción si se puede. Para cancelar, borra el archivo RECARGA de esa carpeta.
           </p>
+        </div>
+
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-xs font-medium">Periodo relativo del informe (desde e1.9, apagado)</p>
+          <p className="text-xs text-muted-foreground">
+            Encendido, el lector intenta una sola vez elegir en el combo de periodo «últimas 24 horas», «último día», «turno actual» u «hoy», sin teclado y nunca durante una recarga. Cambia lo que ve el operador y Matrix recarga el informe. Si Matrix no lo toma, la ficha dice «no tomó» y la opción se elige a mano. Apagarlo no devuelve el combo a «Usuario definido».
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copiar(COMANDO_PERIODO_ENCENDER, 'Comando para encender copiado')}>
+              <Copy className="h-4 w-4 mr-2" />
+              Copiar comando: encender
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void copiar(COMANDO_PERIODO_APAGAR, 'Comando para apagar copiado')}>
+              <Copy className="h-4 w-4 mr-2" />
+              Copiar comando: apagar
+            </Button>
+          </div>
         </div>
       </CardContent>
 
