@@ -8,7 +8,7 @@ import { turnoReal } from '@/services/grader/espejo/__fixtures__/turnosReales'
 import { clasificarP0 } from '@/services/grader/espejo/motivoP0'
 import { loteVivo } from '@/services/grader/espejo/pescaVivo'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
-import { compararLote, hayQueHacer, rotuloCalibres } from '../hayQueHacerDatos'
+import { compararLote, esCalidadD, hayQueHacer, piezasDeCombo, rotuloCalibres } from '../hayQueHacerDatos'
 
 const t0 = Date.parse(extra.t0)
 const PUERTA0: StoredGate0Record[] = extra.puerta0.map(([s, e, g, n]) => ({
@@ -48,8 +48,8 @@ describe('¿Hay que hacer algo?, 18-11 T1', () => {
     const a = momento('04:30').acciones
     expect(a.map((x) => [x.titulo, x.detalle])).toEqual([
       // Calibre por peso (como el mockup, 50 % → 60 %); por etiqueta de Matrix daría 59 % → 74 %.
-      ['Revisar gates de 8-10 lb', 'lote …738 distinto: 8-10 lb pasa a 61 % (antes 50 %)'],
-      ['Agregar gate 10-12 lb Industrial', '134 kg a P0 (26 pz) en el turno'],
+      ['Revisar gates de 8-10 lb', 'El lote …738 trae más 8-10 lb: 61 % del peso (el anterior, 50 %)'],
+      ['Agregar gate 10-12 lb Industrial', '26 pz · 134 kg fueron a P0 porque ninguna gate recibe 10-12 lb Industrial'],
       // El mockup decía «gates 11 y 12» fijo; G11 pasó a 8-10 a las 03:21, así que a las 04:30 solo G12 tiene 10-12.
       ['Repartir 10-12 lb en más gates', '9 pz de puerta no preparada en 15 min (gate 12)'],
     ])
@@ -75,5 +75,21 @@ describe('¿Hay que hacer algo?, 18-11 T1', () => {
   it('kg a P0 del turno por dueño a las 04:30 (Mantención solo fotocélula)', () => {
     const h = momento('04:30')
     expect([Math.round(h.kgMantencion), Math.round(h.kgSeteo)]).toEqual([225, 319])
+  })
+})
+
+describe('«Agregar gate»: cada fila abre SU combinación', () => {
+  it('piezasDeCombo suma exactamente lo que dice la acción (10-12 Industrial, 04:30: 26 pz)', () => {
+    const d = turnoReal('2026-11-18-turno_1')
+    const lim = '2026-11-19T04:30:00'
+    const pz = d.piezas.filter((p) => p.ts >= extra.t0 && p.ts < lim && !(p.ts >= HUECO[0] && p.ts < HUECO[1]))
+    const r = clasificarP0(pz, PUERTA0.filter((x) => x.ts < lim))
+    const ps = piezasDeCombo(r.porPieza, ['10-12 lb'], 'Industrial')
+    expect(ps.reduce((s, p) => s + p.cantidad, 0)).toBe(26)
+    expect(piezasDeCombo(r.porPieza, ['10-12 lb'], 'Premium').every((p) => p.calidad === 'Premium')).toBe(true)
+  })
+  it('la calidad D no pide gate (va a P0 a propósito), con cualquier escritura', () => {
+    expect(['D', 'Calidad D', 'CALIDAD D', ' calidad d '].every(esCalidadD)).toBe(true)
+    expect(['Premium', 'Industrial', 'DESTINO'].some(esCalidadD)).toBe(false)
   })
 })

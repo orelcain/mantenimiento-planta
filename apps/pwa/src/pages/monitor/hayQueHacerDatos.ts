@@ -13,6 +13,7 @@ import type { PiezaP0, ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import { RAFAGA_UMBRAL_PZ } from '@/services/grader/espejo/motivoP0'
 import type { LoteVivo, PerfilPesca } from '@/services/grader/espejo/pescaVivo'
 import { milesPunto } from '@/services/grader/espejo/alertasGrader'
+import { aPieza, type PiezaArbol } from './porQueP0Datos'
 
 export const VENTANA_ACCION_MS = 15 * 60_000
 export const ACCION_FOTO_PZ = RAFAGA_UMBRAL_PZ
@@ -60,9 +61,19 @@ const listaGates = (g: readonly number[]) => {
 }
 const esFoto = (p: PiezaP0) => p.dueno === 'mantencion'
 const esPuertaExacta = (p: PiezaP0) => p.exacto && p.motivo === MOTIVO_PUERTA
+/** «D», «Calidad D» o «CALIDAD D»: la calidad D va a P0 a propósito, no pide gate. */
+export const esCalidadD = (c: string) => /(^|\s)D$/i.test(c.trim())
 /** Piezas «Fuera de límites» por falta de gate (exactas o estimadas). La «calidad D» va a P0 a propósito. */
 const sinGate = (p: PiezaP0) =>
-  p.dueno === 'seteo' && (!p.exacto || p.motivo === MOTIVO_FDL) && (p.causa === 'sin-gate-peso' || p.causa === 'calidad-sin-gate')
+  p.dueno === 'seteo' && (!p.exacto || p.motivo === MOTIVO_FDL) && (p.causa === 'sin-gate-peso' || p.causa === 'calidad-sin-gate') && !esCalidadD(p.calidad)
+
+const claveCombo = (calibres: readonly string[], calidad: string) => `${calibres.join('/')}|${calidad}`
+
+/** Las piezas que explican una acción «Agregar gate»: las mismas que suma, de ese calibre y calidad, para la hoja. */
+export function piezasDeCombo(porPieza: readonly PiezaP0[], calibres: readonly string[], calidad: string): PiezaArbol[] {
+  const k = claveCombo(calibres, calidad)
+  return porPieza.filter((p) => sinGate(p) && claveCombo(p.calibres, p.calidad) === k).map((p) => aPieza(p, p.causa === 'calidad-sin-gate' ? 'calidad' : 'calibre'))
+}
 
 export interface CompararLote {
   distinto: boolean
@@ -132,8 +143,8 @@ export function hayQueHacer(r: ResumenP0, lote: LoteVivo | null, hastaMs: number
       dueno: 'seteo',
       titulo: cal ? `Revisar gates de ${cal}` : 'Revisar gates',
       detalle: cmp.sube
-        ? `lote ${corto} distinto: ${cal} pasa a ${Math.round(cmp.sube.pct)} % (antes ${Math.round(cmp.sube.antes)} %)`
-        : `lote ${corto} distinto: peso medio ${cmp.pesoPct! > 0 ? '+' : ''}${Math.round(cmp.pesoPct!)} %`,
+        ? `El lote ${corto} trae más ${cal}: ${Math.round(cmp.sube.pct)} % del peso (el anterior, ${Math.round(cmp.sube.antes)} %)`
+        : `El lote ${corto} pesa ${cmp.pesoPct! > 0 ? '+' : ''}${Math.round(cmp.pesoPct!)} % por pieza respecto del anterior`,
       estimado: false,
       destino: { tipo: 'lote', lote: lote.lote },
     })
@@ -142,7 +153,7 @@ export function hayQueHacer(r: ResumenP0, lote: LoteVivo | null, hastaMs: number
   const combos = new Map<string, { calibres: string[]; calidad: string; pz: number; kg: number; est: boolean }>()
   for (const p of r.porPieza) {
     if (!sinGate(p)) continue
-    const k = `${p.calibres.join('/')}|${p.calidad}`
+    const k = claveCombo(p.calibres, p.calidad)
     const c = combos.get(k) ?? { calibres: p.calibres, calidad: p.calidad, pz: 0, kg: 0, est: false }
     c.pz += p.cantidad
     c.kg += p.kg
@@ -154,7 +165,7 @@ export function hayQueHacer(r: ResumenP0, lote: LoteVivo | null, hastaMs: number
       clave: `agregar-${c.calibres.join('/')}-${c.calidad}`,
       dueno: 'seteo',
       titulo: `Agregar gate ${rotuloCalibres(c.calibres)} ${c.calidad}`,
-      detalle: `${coma0(c.kg)} kg a P0 (${milesPunto(c.pz)} pz) en el turno${c.est ? ' · estimado' : ''}`,
+      detalle: `${milesPunto(c.pz)} pz · ${coma0(c.kg)} kg fueron a P0 porque ninguna gate recibe ${rotuloCalibres(c.calibres)} ${c.calidad}${c.est ? ' (estimado)' : ''}`,
       estimado: c.est,
       destino: { tipo: 'combo', calibres: c.calibres, calidad: c.calidad },
     })
