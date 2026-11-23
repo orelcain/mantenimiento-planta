@@ -10,6 +10,7 @@ import { coma1, horaDelEje, milesPunto } from '@/services/grader/espejo/alertasG
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
 import type { PiezaP0 } from '@/services/grader/espejo/motivoP0'
 import { Tarjeta } from './TarjetaVivo'
+import { piezasDeCombo, rotuloCalibres } from './hayQueHacerDatos'
 import { detalleMinuto, resumenFila, type ArbolP0, type ClaveFila, type FilaArbol } from './porQueP0Datos'
 
 const IC = 'h-3.5 w-3.5'
@@ -17,7 +18,7 @@ const pzDe = (f: FilaArbol) => (f.piezas ? f.piezas.reduce((s, x) => s + x.canti
 const tono = (f: FilaArbol) => (f.dueno === 'mantencion' ? 'var(--v2-mant)' : f.dueno === 'seteo' ? 'var(--v2-ext)' : 'var(--v2-gris)')
 
 /** Qué hoja está abierta. */
-export type HojaP0 = { tipo: 'fila'; clave: ClaveFila } | { tipo: 'tramo'; desdeMin: number } | { tipo: 'minuto'; min: number } | null
+export type HojaP0 = { tipo: 'fila'; clave: ClaveFila } | { tipo: 'combo'; calibres: string[]; calidad: string } | { tipo: 'tramo'; desdeMin: number } | { tipo: 'minuto'; min: number } | null
 
 function Chip({ tono: t, children }: { tono: string; children: React.ReactNode }) {
   return (
@@ -286,6 +287,19 @@ export function HojasP0({ hoja, onCerrar, a, t0Ms, hastaMin, piezas, porPieza, s
       desc = f.piezas === null ? 'Sin dato' : `${milesPunto(pzDe(f))} pz · ${milesPunto(Math.round(r!.kg))} kg · hasta ${hasta}`
       cuerpo = <HojaFila f={f} hasta={hasta} />
     }
+  } else if (hoja?.tipo === 'combo') {
+    const piezasC = piezasDeCombo(porPieza, hoja.calibres, hoja.calidad)
+    const rot = `${rotuloCalibres(hoja.calibres)} ${hoja.calidad}`
+    const f: FilaArbol = { clave: 'calibre', rotulo: `Agregar gate ${rot}`, nivel: 0, dueno: 'seteo', piezas: piezasC }
+    const r = resumenFila(piezasC)
+    titulo = f.rotulo
+    desc = `${milesPunto(pzDe(f))} pz · ${milesPunto(Math.round(r.kg))} kg a P0 · hasta ${hasta}`
+    cuerpo = (
+      <div className="space-y-3">
+        <p className="text-[13px] leading-[18px] text-muted-foreground">Hoy ninguna gate recibe {rot}: estas piezas pasaron de largo por Gate 0. Con una gate programada para {rot} dejarían de ir a P0.</p>
+        <HojaFila f={f} hasta={hasta} />
+      </div>
+    )
   } else if (hoja?.tipo === 'tramo') {
     let tot = 0
     let p0 = 0

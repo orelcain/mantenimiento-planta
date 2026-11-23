@@ -79,7 +79,7 @@ function hijoFdl(p: PiezaP0): 'calibre' | 'calidad' | 'sinexp' {
   return 'sinexp'
 }
 
-const aPieza = (p: PiezaP0, hijo: ClaveFila | null): PiezaArbol => ({ ts: p.ts, kg: p.kg || null, calidad: p.calidad, gate: gateQueTocaba(p, hijo), cantidad: p.cantidad })
+export const aPieza = (p: PiezaP0, hijo: ClaveFila | null): PiezaArbol => ({ ts: p.ts, kg: p.kg || null, calidad: p.calidad, gate: gateQueTocaba(p, hijo), cantidad: p.cantidad })
 
 /**
  * El árbol. `registros` = Puerta 0 del turno ya recortada a la ventana del turno (o `null`). Las piezas del espejo sin

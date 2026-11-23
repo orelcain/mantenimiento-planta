@@ -237,7 +237,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
   const ultimaHora = d.serie.ultimaTs ? d.serie.ultimaTs.slice(11, 16) : null
   const abrirAccion = (a: Accion) => {
     if (a.destino.tipo === 'tramo') setHoja({ tipo: 'tramo', desdeMin: Math.max(0, Math.floor((a.destino.desdeMs - d.serie.t0Ms) / 60_000)) })
-    else if (a.destino.tipo === 'combo') setHoja({ tipo: 'fila', clave: 'calibre' })
+    else if (a.destino.tipo === 'combo') setHoja({ tipo: 'combo', calibres: a.destino.calibres, calidad: a.destino.calidad })
     else if (a.destino.tipo === 'lote') setLoteAbierto(indiceLote(d.lotes, a.destino.lote))
   }
   return (
