@@ -8,18 +8,15 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BellRing, Filter, Hand, Layers, Package, ShieldAlert, SplitSquareHorizontal } from 'lucide-react'
+import { BellRing, Filter, Hand, Layers, Package, SplitSquareHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
-import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/graderVivo'
-import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { Tarjeta } from './TarjetaVivo'
 import { CuantoLlevamos } from './CuantoLlevamos'
 import { HayQueHacerAlgo } from './HayQueHacerAlgo'
+import { GraficoVivo } from './GraficoVivo'
 import { cuentaDelTurno } from './cuantoLlevamosDatos'
-import { RELLENO_DUENO } from './ejeTurno'
-import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
+import { armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
 import { desgloseP0 } from '@/services/grader/espejo/motivoP0'
 
@@ -82,205 +79,6 @@ function Cifra({ k, v, s, chico }: { k: string; v: string; s: string; chico?: bo
       <p className={cn('mt-1 font-semibold tracking-tight tabular-nums text-foreground', chico ? 'text-[20px] leading-[32px] lg:leading-[38px]' : 'text-[28px] leading-[32px] lg:text-[32px] lg:leading-[38px]')}>{v}</p>
       <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{s}</p>
     </div>
-  )
-}
-
-/* Los trazos del Ritmo en vivo: el grader en el acento (2,5 px), las Baader como la curva de referencia (gris 1,5 px). */
-const GRADER = 'var(--v2-acento)'
-const BAADER = 'rgb(var(--muted-foreground) / 0.65)'
-
-/** Une las detenciones por dueño para no apilar transparencias (tres Baader paradas = una banda). */
-function bandas(paradas: Datos['paradas']): Array<{ desde: number; hasta: number; dueno: DuenoPerdida }> {
-  const por = new Map<DuenoPerdida, Array<[number, number]>>()
-  for (const p of paradas) {
-    const l = por.get(p.dueno) ?? []
-    l.push([p.desde, p.hasta])
-    por.set(p.dueno, l)
-  }
-  const out: Array<{ desde: number; hasta: number; dueno: DuenoPerdida }> = []
-  for (const [dueno, iv] of por) {
-    iv.sort((a, b) => a[0] - b[0])
-    let cur: [number, number] | null = null
-    for (const x of iv) {
-      if (cur && x[0] <= cur[1]) cur[1] = Math.max(cur[1], x[1])
-      else { if (cur) out.push({ desde: cur[0], hasta: cur[1], dueno }); cur = [x[0], x[1]] }
-    }
-    if (cur) out.push({ desde: cur[0], hasta: cur[1], dueno })
-  }
-  return out
-}
-
-function Curva({ d }: { d: Datos }) {
-  const [ref, w] = useAncho<HTMLDivElement>()
-  const h = w >= 600 ? 240 : 180
-  const L = d.retraso.min
-  // «r» es la correlación de las dos curvas; en pantalla va en palabras (pedido del recorrido del 22-11).
-  const sub = d.retraso.medido
-    ? `La curva del grader va ${L} min atrasada: es lo que tarda una pieza en llegar de las Baader al grader, medido en este turno (las curvas coinciden ${(d.retraso.r ?? 0) >= 0.8 ? 'bien' : 'a medias'}).`
-    : `La curva del grader va ${L} min atrasada: lo que tarda una pieza en llegar de las Baader al grader, según la ${RETRASO_REFERENCIA_FUENTE}. Este turno aún no alcanza para medirlo.`
-  return (
-    <Tarjeta titulo="Piezas por minuto" sub={sub} icono={<Activity className={IC} />}>
-      <div ref={ref} className="mt-3 w-full">
-        {w > 0 && <CurvaSvg d={d} w={w} h={h} />}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] leading-[18px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-4 rounded-full" style={{ background: GRADER }} />Grader</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: BAADER }} />3 Baader 142</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.mantencion} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.mantencion}` }} />Detención Mantención</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.externo} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.externo}` }} />Otras detenciones</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 border border-dashed" style={{ borderColor: 'var(--v2-gris)' }} />Programada</span>
-      </div>
-    </Tarjeta>
-  )
-}
-
-function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
-  const ml = 30
-  const mr = 8
-  const mt = 12
-  const mb = 22
-  const W = Math.max(10, w - ml - mr)
-  const H = h - mt - mb
-  const n = d.n
-  const L = d.retraso.min
-  const g = movil(d.serie.pz.slice(0, d.serie.hastaMin), 3)
-  // Las Baader se dibujan desde que empieza su serie (antes van en NaN: sin cobertura).
-  const b0 = d.baader ? Math.max(0, d.baader.findIndex((v) => Number.isFinite(v))) : 0
-  const b = d.baader ? movil(d.baader.slice(b0, Math.min(d.baader.length, n)), 3) : []
-  let tope = 10
-  for (const v of g) tope = Math.max(tope, v)
-  for (const v of b) tope = Math.max(tope, v)
-  const paso = tope > 60 ? 20 : 10
-  const max = Math.ceil(tope / paso) * paso
-  const x = (m: number) => ml + (W * Math.max(0, Math.min(n, m))) / n
-  const y = (v: number) => mt + H - (H * Math.min(v, max)) / max
-  const traza = (vals: number[], corre: number) => {
-    let s = ''
-    for (let i = 0; i < vals.length; i++) {
-      const m = i - corre
-      if (m < 0 || m > n) continue
-      s += `${s ? 'L' : 'M'}${x(m).toFixed(1)} ${y(vals[i] ?? 0).toFixed(1)}` // decimal-tecnico: ruta SVG, el punto es obligatorio
-    }
-    return s
-  }
-  const cada = W / n >= 1.6 ? 60 : 120
-  const minDia = Math.floor(d.serie.t0Ms / 60_000)
-  const primera = (60 - (((minDia % 60) + 60) % 60)) % 60
-  const marcas: number[] = []
-  for (let m = primera; m <= n; m += cada) marcas.push(m)
-  const rayas: number[] = []
-  for (let v = 0; v <= max; v += paso) rayas.push(v)
-  const ultima = d.serie.hastaMin - L
-  return (
-    <svg width={w} height={h} role="img" aria-label="Piezas por minuto del grader y de las Baader" className="block">
-      {rayas.map((v) => (
-        <g key={v}>
-          <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-          <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
-        </g>
-      ))}
-      {/* Detenciones como las bandas del Ritmo en vivo: velo del tono con su borde arriba; la programada, solo contorno punteado. */}
-      {bandas(d.paradas).map((p, i) => {
-        const bx = x(p.desde)
-        const bw = Math.max(1, x(p.hasta) - x(p.desde))
-        if (p.dueno === 'programado') {
-          return <rect key={i} x={bx} y={mt} width={bw} height={H} rx={2} fill="none" stroke="var(--v2-gris)" strokeDasharray="3 3" />
-        }
-        const tono = RELLENO_DUENO[p.dueno]
-        return (
-          <g key={i}>
-            <rect x={bx} y={mt} width={bw} height={H} fill={tono} fillOpacity={0.14} />
-            <line x1={bx} x2={bx + bw} y1={mt} y2={mt} stroke={tono} strokeOpacity={0.7} strokeWidth={2} />
-          </g>
-        )
-      })}
-      {marcas.map((m) => (
-        <text key={m} x={x(m)} y={h - 6} textAnchor="middle" fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, m)}</text>
-      ))}
-      {b.length > 0 && <path d={traza(b, -b0)} fill="none" stroke={BAADER} strokeWidth={1.5} strokeLinejoin="round" />}
-      <path d={traza(g, L)} fill="none" stroke={GRADER} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" data-serie="grader" />
-      {ultima > 0 && ultima < n && (
-        <>
-          <line x1={x(ultima)} x2={x(ultima)} y1={mt} y2={mt + H} stroke="rgb(var(--foreground) / 0.35)" strokeWidth={1} />
-          <circle cx={x(ultima)} cy={y(g[g.length - 1] ?? 0)} r={4.5} fill={GRADER} stroke="rgb(var(--background))" strokeWidth={2} />
-        </>
-      )}
-    </svg>
-  )
-}
-
-function P0Barras({ d }: { d: Datos }) {
-  const [ref, w] = useAncho<HTMLDivElement>()
-  const ts = d.p0
-  const h = 130
-  const ml = 38
-  const mr = 8
-  const mt = 8
-  const mb = 20
-  const W = Math.max(10, w - ml - mr)
-  const H = h - mt - mb
-  let tope = 6
-  for (const t of ts) if (t.pct !== null && !t.pocaMasa) tope = Math.max(tope, Math.ceil(t.pct))
-  const y = (v: number) => mt + H - (H * Math.min(v, tope)) / tope
-  const bw = ts.length > 0 ? W / Math.max(ts.length, 8) : W
-  const umbral = DEFAULT_P0_CRITICAL_PCT
-  return (
-    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo${d.pesca && d.pesca.p0Dueno.exactitud !== 'exacto' && d.pesca.p0Dueno.pz > 0 ? ' · estimado' : ''}`} icono={<ShieldAlert className={IC} />}>
-      <div ref={ref} className="mt-3 w-full">
-        {d.totales.p0 === null ? (
-          <p className="py-6 text-center text-[13px] text-muted-foreground">
-            {d.totales.piezas >= PIEZAS_PARA_DECIR_SIN_GATE0 ? 'P0 llega con Puerta 0: este informe no trae piezas de Gate 0.' : 'Sin rechazos todavía.'}
-          </p>
-        ) : w > 0 && (
-          <svg width={w} height={h} role="img" aria-label="P0 por tramo de 15 minutos" className="block">
-            {[0, Math.round(tope / 2), tope].map((v) => (
-              <g key={v}>
-                <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
-                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v} %</text>
-              </g>
-            ))}
-            {ts.map((t, i) => {
-              if (t.pct === null) return null
-              const alto = !t.pocaMasa && t.pct - umbral > 1e-9 /* la misma comparación de la regla */
-              const x0 = ml + i * bw + 1
-              const w0 = Math.max(1, bw - 2)
-              const titulo = `${t.rotulo}: ${coma1(t.pct)} % (${milesPunto(t.g0)} de ${milesPunto(t.total)})`
-              if (t.mantPz != null && !t.pocaMasa && t.total > 0) {
-                // Apilada por dueño: seteo y pesca abajo, Mantención arriba (como en el mockup).
-                const pctM = (t.mantPz / t.total) * 100
-                const pctS = Math.max(0, t.pct - pctM)
-                return (
-                  <g key={t.desde} data-tramo={t.rotulo}>
-                    <rect x={x0} y={y(pctS)} width={w0} height={mt + H - y(pctS)} rx={2} fill="var(--v2-ext)" fillOpacity={0.6} />
-                    <rect x={x0} y={y(t.pct)} width={w0} height={y(pctS) - y(t.pct)} rx={2} fill="var(--v2-mant)" />
-                    <title>{`${titulo} · Mantención ${milesPunto(Math.round(t.mantPz))}, seteo ${milesPunto(Math.round(t.g0 - t.mantPz))}`}</title>
-                  </g>
-                )
-              }
-              return (
-                <rect
-                  key={t.desde}
-                  x={x0}
-                  y={y(t.pct)}
-                  width={w0}
-                  height={mt + H - y(t.pct)}
-                  rx={2}
-                  data-tramo={t.rotulo}
-                  fill={t.pocaMasa ? 'var(--v2-prog)' : alto ? 'var(--v2-mal)' : 'var(--v2-acento)'}
-                  fillOpacity={t.pocaMasa || alto ? 1 : 0.5}
-                >
-                  <title>{titulo}</title>
-                </rect>
-              )
-            })}
-            <line x1={ml} x2={w - mr} y1={y(umbral)} y2={y(umbral)} stroke="var(--v2-mal)" strokeWidth={1} strokeDasharray="2 4" />
-            {ts.map((t, i) => (i % 4 === 0 ? (
-              <text key={`h${t.desde}`} x={ml + i * bw} y={h - 4} fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, t.desde)}</text>
-            ) : null))}
-          </svg>
-        )}
-      </div>
-    </Tarjeta>
   )
 }
 
@@ -610,7 +408,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
         <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} />
         {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} />}
       </div>
-      <Curva d={d} />
+      <GraficoVivo d={d} />
       {d.pesca?.seteo && (
         <>
           <SeteoGates s={d.pesca.seteo} />
@@ -626,8 +424,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
           <LoteYPesca p={d.pesca} />
         </>
       )}
-      <div className="grid gap-3 lg:grid-cols-3">
-        <P0Barras d={d} />
+      <div className="grid gap-3 lg:grid-cols-2">
         <CalibreCalidad d={d} />
         <LineaManual d={d} />
       </div>
