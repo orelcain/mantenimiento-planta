@@ -181,6 +181,7 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
         ) : (
           <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-2.5 rounded-[2px] opacity-60" style={{ background: 'var(--v2-acento)' }} />P0</span>
         )}
+        {g.manual.length > 0 && <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-1.5 w-4 rounded-[2px]" style={{ background: 'var(--v2-acento)', opacity: 0.7 }} />Manual (estimado)</span>}
         {g.huecos.length > 0 && <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 border border-dashed" style={{ background: 'var(--v2-reja)', borderColor: 'var(--v2-gris)' }} />Sin lectura</span>}
       </div>
       <details className="mt-2 text-[13px] leading-[18px] text-muted-foreground">
@@ -189,7 +190,7 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
           <li>Rueda para acercar y arrastrar para mover; la barra de abajo recorre el turno. En el celular, la barra y los botones.</li>
           <li>«Todo · Mantención · Seteo» resalta el P0 de ese dueño y atenúa el resto.</li>
           <li>Con más de 60 min a la vista, el P0 va en barras de 15 min en % con la raya de 3,5 % (la alerta «P0 alto»). Al acercar, barras por minuto en piezas.</li>
-          <li>Franja de arriba: los lotes del turno; tocar uno abre su ficha y avisa si es distinto del anterior.</li>
+          <li>Franja de arriba: los lotes del turno; tocar uno abre su ficha y avisa si es distinto del anterior. Debajo, los tramos de entrada manual estimada (señal débil: ver «Línea manual»).</li>
           <li>Tramos grises: sin lectura del espejo o menos de 50 piezas. En el celular arranca en la última hora.</li>
         </ul>
       </details>

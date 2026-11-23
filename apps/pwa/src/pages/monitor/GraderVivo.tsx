@@ -8,8 +8,7 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BellRing, Hand, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { BellRing, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { Tarjeta } from './TarjetaVivo'
 import { CuantoLlevamos } from './CuantoLlevamos'
@@ -17,6 +16,7 @@ import { HayQueHacerAlgo } from './HayQueHacerAlgo'
 import { GraficoVivo } from './GraficoVivo'
 import { HojasP0, PorQueP0, type HojaP0 } from './PorQueP0'
 import { HojaLote, LotesDelTurno } from './LotesDelTurno'
+import { LineaManual } from './LineaManual'
 import { indiceLote } from './lotesTurnoDatos'
 import type { Accion } from './hayQueHacerDatos'
 import { cuentaDelTurno } from './cuantoLlevamosDatos'
@@ -100,48 +100,6 @@ function CalibreCalidad({ d }: { d: Datos }) {
           <div className="mt-3"><Reparto titulo="Calibre" filas={r.calibre} /></div>
           <div className="mt-4"><Reparto titulo="Calidad" filas={r.calidad} /></div>
         </>
-      )}
-    </Tarjeta>
-  )
-}
-
-function LineaManual({ d }: { d: Datos }) {
-  const filas = d.manual
-  const leidas = filas.filter((f) => f.diferencia !== null)
-  const tope = Math.max(1, ...leidas.map((f) => Math.abs(f.diferencia ?? 0)))
-  const total = leidas.reduce((a, f) => a + (f.diferencia ?? 0), 0)
-  const sinLectura = filas.length - leidas.length
-  return (
-    <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora" icono={<Hand className={IC} />}>
-      {!d.baader ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin la serie por minuto de Shoplogix no se puede restar.</p>
-      ) : filas.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
-      ) : (
-        <div className="mt-3 space-y-1.5">
-          {filas.map((f) => f.diferencia === null ? (
-            <div key={f.hora} data-hora={f.hora} data-sin-lectura className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
-              <span className="tabular-nums text-foreground/80">{f.hora}</span>
-              <span className="h-2.5 rounded-full border border-dashed border-border" aria-hidden />
-              <span className="text-right text-[12px] text-muted-foreground">sin lectura</span>
-            </div>
-          ) : (
-            <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
-              <span className="tabular-nums text-foreground/80">{f.hora}</span>
-              <span className="relative h-2.5 rounded-full bg-muted">
-                <span aria-hidden className="absolute inset-y-[-3px] left-1/2 w-px bg-foreground/25" />
-                <span
-                  className={cn('absolute inset-y-0 rounded-full', f.diferencia >= 0 ? 'left-1/2' : 'right-1/2')}
-                  style={{ width: `${(Math.abs(f.diferencia) / tope) * 50}%`, background: f.diferencia >= 0 ? 'var(--v2-acento)' : 'var(--v2-gris)' }}
-                />
-              </span>
-              <span className="text-right font-semibold tabular-nums text-foreground">{f.diferencia > 0 ? '+' : f.diferencia < 0 ? '−' : ''}{milesPunto(Math.abs(f.diferencia))}</span>
-            </div>
-          ))}
-          <p className="pt-1.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
-            {leidas.length} {leidas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas.{sinLectura > 0 ? ` ${sinLectura === 1 ? 'Una hora queda' : `${sinLectura} horas quedan`} fuera: el espejo no la leyó entera.` : ''} La hora en curso entra al cerrar.
-          </p>
-        </div>
       )}
     </Tarjeta>
   )
@@ -302,7 +260,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
             <PorQueP0 a={d.pesca.arbol} piezasTurno={d.totales.piezas} hasta={ultimaHora ?? ''} onAbrir={(k) => setHoja({ tipo: 'fila', clave: k })} />
             <div className="grid gap-3">
               <LotesDelTurno filas={d.lotes} t0Ms={d.serie.t0Ms} hastaMin={d.serie.hastaMin} onAbrir={setLoteAbierto} />
-              <LineaManual d={d} />
+              <LineaManual d={d} enCurso={turnoEnCurso} />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -326,7 +284,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
       )}
       <div className="grid gap-3 lg:grid-cols-2">
         <CalibreCalidad d={d} />
-        {!d.pesca && <LineaManual d={d} />}
+        {!d.pesca && <LineaManual d={d} enCurso={turnoEnCurso} />}
       </div>
     </div>
   )

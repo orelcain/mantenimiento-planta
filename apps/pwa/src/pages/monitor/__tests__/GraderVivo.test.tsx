@@ -113,7 +113,8 @@ describe('GraderVivo', () => {
   it('la línea manual muestra horas completas y la de las 08:00 sale', () => {
     render(<GraderVivo {...entrada({})} />)
     expect(document.querySelector('[data-hora="08:00"]')).toBeTruthy()
-    expect(document.querySelector('[data-hora="10:00"]')).toBeNull() // en curso a las 10:50
+    // La hora abierta (10:00 a las 10:50) va como «en curso», sin cifra.
+    expect(document.querySelector('[data-hora="10:00"]')?.getAttribute('data-tipo')).toBe('enCurso')
   })
 
   it('P4: sin piezas pero con el lector caído, la alerta se ve igual', () => {

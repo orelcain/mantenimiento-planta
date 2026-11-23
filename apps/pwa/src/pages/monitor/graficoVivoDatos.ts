@@ -13,6 +13,7 @@ import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/g
 import { coma1, horaDelEje, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import type { PiezaP0 } from '@/services/grader/espejo/motivoP0'
 import type { DatosGraderVivo } from './graderVivoDatos'
+import { tramosManual } from './lineaManualDatos'
 import { franjaLotes, loteCorto, loteDelMinuto, rotuloFranja, type FranjaLote } from './lotesTurnoDatos'
 
 /** Lo más que se acerca el zoom: 5 minutos a la vista. */
@@ -225,10 +226,10 @@ export interface DatosGrafico {
   baader5: boolean
 }
 
-export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
+/** Grader por minuto (`null` sin lectura) y Baader corridas `retraso` al eje del grader (`null` sin cobertura). */
+export function seriesEje(d: Pick<DatosGraderVivo, 'serie' | 'retraso' | 'sinLectura' | 'baader'>): { grader: Array<number | null>; baader: Array<number | null> | null } {
   const hasta = d.serie.hastaMin
   const L = d.retraso.min
-  const porPieza = d.pesca?.p0Dueno.porPieza ?? null
   const grader: Array<number | null> = []
   for (let m = 0; m < hasta; m++) grader.push(d.sinLectura[m] ? null : (d.serie.pz[m] ?? 0))
   let baader: Array<number | null> | null = null
@@ -239,6 +240,14 @@ export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
       baader.push(v !== undefined && Number.isFinite(v) ? v : null)
     }
   }
+  return { grader, baader }
+}
+
+export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
+  const hasta = d.serie.hastaMin
+  const L = d.retraso.min
+  const porPieza = d.pesca?.p0Dueno.porPieza ?? null
+  const { grader, baader } = seriesEje(d)
   return {
     t0Ms: d.serie.t0Ms,
     hasta,
@@ -253,7 +262,7 @@ export function datosGrafico(d: DatosGraderVivo): DatosGrafico {
     barras: { '15': barrasP0(d, porPieza, '15'), min: barrasP0(d, porPieza, 'min') },
     sinP0: d.totales.p0 === null,
     lotes: franjaLotes(d.lotes),
-    manual: [],
+    manual: tramosManual(grader, baader),
     baader5: false,
   }
 }
@@ -465,6 +474,24 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
         },
       } as never,
       {
+        id: 'manual',
+        name: 'Manual (estimado)',
+        type: 'custom',
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        clip: false,
+        silent: true,
+        tooltip: { show: false },
+        data: g.manual.filter(([a, b]) => b > v.a && a < v.b).map(([a, b, pz]) => [a, b, pz]),
+        encode: { x: [0, 1] },
+        renderItem: (_params: unknown, api: unknown) => {
+          const a = api as { value: (i: number) => number; coord: (p: [number, number]) => [number, number] }
+          const px0 = a.coord([Math.max(a.value(0), v.a), 0])[0]
+          const px1 = a.coord([Math.min(a.value(1), v.b), 0])[0]
+          return { type: 'rect', shape: { x: px0, y: FRANJA.manualY, width: Math.max(2, px1 - px0), height: FRANJA.manualAlto, r: 2 }, style: { fill: tema.acento, opacity: 0.7 } }
+        },
+      } as never,
+      {
         id: 'p0',
         name: modo === '15' ? 'P0 cada 15 min (%)' : 'P0 por minuto (piezas)',
         type: 'custom',
@@ -531,6 +558,7 @@ export function textoMinuto(g: DatosGrafico, m: number): string {
   const avisos: string[] = []
   if (gr === null) avisos.push('sin lectura')
   if (g.detenciones.some(([a, b]) => m >= a && m < b)) avisos.push('detenida')
+  if (g.manual.some(([a, b]) => m >= a && m < b)) avisos.push('entrada manual (est.)')
   const fila = (k: string, val: string) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${k}</span><span style="font-family:IBM Plex Mono,monospace">${val}</span></div>`
   return `<b style="font-family:IBM Plex Mono,monospace">${horaDelEje(g.t0Ms, m)}</b>`
     + fila('Grader', gr === null || gr === undefined ? '—' : String(gr))
