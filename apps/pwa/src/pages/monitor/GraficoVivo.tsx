@@ -194,9 +194,12 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
       el.removeEventListener('pointercancel', onUp)
     }
   }, [ref])
+  // El slider es el único dataZoom que mueve la persona: se lee SU ventana (no la del `inside`, que va deshabilitado)
+  // y entra a la misma fuente de verdad (`ventana`) que usan los botones, los gestos y el rótulo.
   const onZoom = useCallback(() => {
     const inst = chart.current?.getEchartsInstance()
-    const dz = (inst?.getOption() as { dataZoom?: Array<{ startValue?: number; endValue?: number }> } | undefined)?.dataZoom?.[0]
+    const dzs = (inst?.getOption() as { dataZoom?: Array<{ id?: string; startValue?: number; endValue?: number }> } | undefined)?.dataZoom
+    const dz = dzs?.find((z) => z.id === 'dz-slider') ?? dzs?.[1]
     if (dz && dz.startValue != null && dz.endValue != null) fijar({ a: dz.startValue, b: dz.endValue })
   }, [fijar])
   const onClic = useCallback((p: { seriesId?: string; value?: number[] }) => {
@@ -234,7 +237,6 @@ export function GraficoVivo({ d, onAbrirTramo, onAbrirMinuto, onAbrirLote }: { d
           <ReactECharts
             ref={chart}
             option={opcion}
-            notMerge
             lazyUpdate
             style={{ height: alto, width: '100%' }}
             opts={{ renderer: 'canvas' }}

@@ -14,6 +14,7 @@ import {
   ROTULO_HUECO_MIN_PX,
   ZOOM_MIN_MIN,
   barrasP0,
+  conAlfa,
   datosGrafico,
   limitarVentana,
   zoomAncla,
@@ -170,6 +171,22 @@ describe('datos y opción del gráfico', () => {
     }
     expect(raya({ a: 0, b: 435 })).toBe(true)
     expect(raya({ a: 375, b: 435 })).toBe(false)
+  })
+
+  it('el minimapa abarca todo el turno y el dataZoom lleva la ventana (una sola fuente de verdad)', () => {
+    const v = { a: 375, b: 435 }
+    const o = opcionGrafico(g, v, '', TEMA, 375) as {
+      xAxis: Array<{ min: number; max: number }>
+      dataZoom: Array<{ id: string; startValue: number; endValue: number }>
+    }
+    for (const x of o.xAxis) { expect(x.min).toBe(0); expect(x.max).toBe(g.hasta) }
+    const slider = o.dataZoom.find((z) => z.id === 'dz-slider')!
+    expect([slider.startValue, slider.endValue]).toEqual([v.a, v.b])
+  })
+
+  it('conAlfa pasa rgb() a rgba() y deja otros formatos', () => {
+    expect(conAlfa('rgb(46, 117, 182)', 0.2)).toBe('rgba(46, 117, 182, 0.2)')
+    expect(conAlfa('#2e75b6', 0.2)).toBe('#2e75b6')
   })
 
   it('sin piezas una a una (sin pesca), el gráfico se arma igual', () => {

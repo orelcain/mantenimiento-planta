@@ -1,7 +1,7 @@
 {
   "version": "4.23.6",
   "buildDate": "2026-11-24",
-  "buildTimestamp": 1795515788971,
+  "buildTimestamp": 1795516320689,
   "features": [
     "Monitor: Camino a la meta muestra la misma cascada que «Dónde se fueron las piezas» (las mismas cifras), y su detalle abre con la cascada y debajo las detenciones con sus notas",
     "Monitor: el tablero muestra la misma cascada a la meta que la vista clásica, con su detalle por causa, Baader y hora, y dice de quién es cada pérdida",
