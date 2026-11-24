@@ -88,6 +88,35 @@ describe('SONDA_MATRIX_PS1', () => {
     expect(SONDA_MATRIX_PS1).toContain('saca una foto del combo de periodo desplegado')
   })
 
+  it('sección 5b: busca el selector de informes y dice si se podría pasar a «Puerta 0» sin mouse', () => {
+    const s5b = SONDA_MATRIX_PS1.slice(SONDA_MATRIX_PS1.indexOf("T '5b. SELECTOR DE INFORMES"), SONDA_MATRIX_PS1.indexOf("T '6. VEREDICTO'"))
+    expect(s5b.length).toBeGreaterThan(2000)
+    // Reconoce los informes de Matrix por nombre, con «Puerta 0» como objetivo.
+    expect(SONDA_MATRIX_PS1).toContain('puerta\\s*0')
+    expect(SONDA_MATRIX_PS1).toContain('pieza\\s*(a\\s*)?pieza')
+    // Tabla medida en Qt 5.15: pestaña y botón sí, menú con pantalla, lista a probar, árbol y combo no.
+    for (const via of ["@('si', 'pestaña", "@('si-menu'", "@('si', 'botón", "@('quizas'", "@('no', 'ítem de árbol", "@('no', 'opción de combo"]) {
+      expect(s5b).toContain(via)
+    }
+    // Los ítems del menú solo existen con el menú abierto: pide foto, no lo abre.
+    expect(s5b).toContain("$st.sel = 'menu-cerrado'")
+    // Solo lee patrones y estado; nunca los usa.
+    expect(s5b).toContain('.GetSupportedPatterns()')
+    expect(s5b).not.toMatch(/\.Invoke\(\)|\.Select\(\)|\.Expand\(\)|DoDefaultAction|SetFocus|PostMessage|SendMessage/)
+    // Mantiene el filtro de licencia al juntar ítems.
+    expect(s5b).toContain("$nm -notmatch '(?i)licen|hardware'")
+  })
+
+  it('veredicto y resumen dicen qué pasa con el selector de informes', () => {
+    for (const caso of ["'si'", "'si-menu'", "'quizas'", "'no'", "'menu-cerrado'"]) {
+      expect(SONDA_MATRIX_PS1).toContain(`  ${caso} { F ("Informes: `)
+    }
+    expect(SONDA_MATRIX_PS1).toContain("  'ninguno' { F 'Informes: sin dato")
+    expect(SONDA_MATRIX_PS1).toContain("$res8.Add('Selector de informes: '")
+    // Los combos de Qt (y su lista interna) no cuentan como lista elegible.
+    expect(SONDA_MATRIX_PS1).toContain("$c.ClassName -notmatch 'QComboBox'")
+  })
+
   it('del registro de Marelec solo muestra ReportPeriod', () => {
     expect(SONDA_MATRIX_PS1).toContain("'HKCU:\\Software\\Marelec\\MATRIX CG'")
     expect(SONDA_MATRIX_PS1).toContain("$_.Name -match '^ReportPeriod'")

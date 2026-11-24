@@ -1,5 +1,5 @@
 /**
- * Sonda de solo lectura que se copia desde la página Diagnóstico Matrix: dice si Matrix se puede manejar sin mouse ni teclado, cómo está el lector del espejo en este PC y deja un resumen en el portapapeles.
+ * Sonda de solo lectura que se copia desde la página Diagnóstico Matrix: dice si Matrix se puede manejar sin mouse ni teclado, si su selector de informes se podría pasar a «Puerta 0» sin tocar el PC, cómo está el lector del espejo en este PC y deja un resumen en el portapapeles.
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/sonda-controles-matrix.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
@@ -7,7 +7,8 @@ export const SONDA_MATRIX_PS1 = `# Sonda de controles de Matrix (Marelec). SOLO 
 # Responde una pregunta: ¿se puede manejar Matrix sin mouse ni teclado (UI Automation de Windows)?
 # Uso: abrir Matrix, dejar en pantalla lo que se quiere mirar, abrir PowerShell, pegar TODO y Enter.
 #   Corrida 1: con el informe «Pieza pieza Grader» ya cargado en pantalla (también lista los combos,
-#   como el de periodo «Usuario definido», con sus opciones; no los despliega ni los cambia).
+#   como el de periodo «Usuario definido», con sus opciones; no los despliega ni los cambia, y en la
+#   sección 5b busca el selector de informes y dice si se podría pasar a «Puerta 0» sin mouse ni teclado).
 #   Corrida 2: con la ventana de exportar o guardar abierta (sin guardar nada).
 #   También dice cómo está el lector del espejo en este PC (sección 7: solo mira sus archivos, sin red y sin
 #   abrir la llave) y deja un resumen corto (sección 8) en pantalla y en el portapapeles, para una foto o pegarlo.
@@ -59,6 +60,10 @@ $procs = @(Get-Process | Where-Object { $_.ProcessName -match $filtro })
 $st = @{ n = 0; cortado = ''; sinAcceso = $false; licencia = $false; ventanas = 0 }
 $tipos = @{}; $pats = @{}; $marcos = @{}
 $combos = New-Object System.Collections.Generic.List[object]   # ComboBox vistos, para la sección 5
+$contSel = New-Object System.Collections.Generic.List[object]  # listas, árboles, pestañas y menús, para la sección 5b
+$botSel = New-Object System.Collections.Generic.List[object]   # botones con nombre de informe, para la sección 5b
+# Nombres de informes de Matrix CG vistos en planta (20-11): sirven para reconocer el selector de informes.
+$reInforme = '(?i)pieza\\s*(a\\s*)?pieza|puerta\\s*0|piezas\\s*errores|calidad\\s*grader|productividad|^\\s*lotes?\\s*$|totales\\s*de\\s*producci|calibraci|conservaci'
 $reloj = [Diagnostics.Stopwatch]::StartNew()
 $reClave = '(?i)export|excel|csv|guardar|save|archivo|file|10\\s?[.,]?000|recuperad|pieza|informe|report|actualizar|refresh|desde|hasta|fecha|imprimir|print'
 $reToolkit = '(?i)^(System\\.Windows\\.Forms|PresentationFramework|Qt\\d|vcl|rtl\\d|mfc\\d|wx|DevExpress|Telerik|Infragistics|Syncfusion|C1\\.|CrystalDecisions|FastReport|Stimulsoft|javaw|jvm|libcef|electron)'
@@ -82,6 +87,8 @@ function Nodo($e, [int]$nivel) {
     if ($pp -contains 'Grid') { try { $g = $e.GetCurrentPattern([System.Windows.Automation.GridPattern]::Pattern).Current; $extra += " filas=$($g.RowCount) columnas=$($g.ColumnCount)" } catch {} }
     if (-not $c.IsEnabled) { $extra += ' (deshabilitado)' }
     if ($tipo -eq 'ComboBox' -and $combos.Count -lt 30) { $combos.Add($e) }
+    if ($tipo -match '^(List|Tree|Tab|MenuBar|Menu)$' -and $c.ClassName -notmatch 'QComboBox' -and $contSel.Count -lt 40) { $contSel.Add($e) }
+    if ($tipo -match '^(Button|SplitButton|Hyperlink|RadioButton)$' -and $c.Name -match $reInforme -and $botSel.Count -lt 20) { $botSel.Add($e) }
     $linea = '[{0}] "{1}" id={2} clase={3} {{{4}}}{5}' -f $tipo, $nombre, (Corto $c.AutomationId 30), (Corto $c.ClassName 40), ($pp -join ','), $extra
     $D.Add(('  ' * $nivel) + $linea)
     $esControl = $tipo -match '^(Button|MenuItem|CheckBox|Edit|ComboBox|DataGrid|Table|TabItem|RadioButton|SplitButton|Hyperlink|Calendar|Text|StatusBar)$'
@@ -204,6 +211,86 @@ foreach ($k in @('HKCU:\\Software\\Marelec\\MATRIX CG', 'HKCU:\\Software\\Marele
   } catch {}
 }
 
+T '5b. SELECTOR DE INFORMES (¿se puede pasar a «Puerta 0» sin mouse ni teclado?)'
+# Solo lee: tipo, clase, patrones y qué ítem está elegido. No pulsa, no elige, no abre menús ni mueve el foco.
+# Lo que se puede y lo que no, medido el 23-11 con una ventana de prueba en Qt 5.15 (Matrix CG es Qt 5.13), igual
+# con la ventana minimizada: pestaña e ítem de menú cambian con Invoke; botón, con Invoke; un ítem de lista con Select
+# cambia SOLO la selección (no el ítem actual ni simula clic); árbol y combo no cambian por UI Automation.
+$st.sel = 'ninguno'; $st.selTxt = ''; $st.selActual = ''
+$reMenuInf = '(?i)informe|report|ver\\b|view|ventana|window|listado'
+function Items-De($e, [int]$nivel, $acc) {
+  if ($nivel -gt 4 -or $acc.visitas -ge 300) { return }
+  $h = $null; try { $h = $RW.GetFirstChild($e) } catch {}
+  while ($h -and $acc.visitas -lt 300) {
+    $acc.visitas++
+    try {
+      $t = $h.Current.ControlType.ProgrammaticName -replace '^ControlType\\.', ''
+      $nm = [string]$h.Current.Name
+      if ($t -match '^(ListItem|TreeItem|TabItem|MenuItem|DataItem|Button|RadioButton)$' -and $nm -and $nm -notmatch '(?i)licen|hardware') { $acc.items.Add(@{ el = $h; tipo = $t; nombre = $nm }) }
+    } catch {}
+    Items-De $h ($nivel + 1) $acc
+    try { $h = $RW.GetNextSibling($h) } catch { $h = $null }
+  }
+}
+function Patrones-De($e) { try { @($e.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName -replace 'PatternIdentifiers\\.Pattern$', '' }) } catch { @() } }
+function Padres-De($e) {
+  $r = New-Object System.Collections.Generic.List[string]; $x = $e
+  for ($i = 0; $i -lt 3; $i++) { try { $x = $W.GetParent($x); if (-not $x) { break }; $r.Add(((($x.Current.ControlType.ProgrammaticName -replace '^ControlType\\.', '')) + ':' + (Corto $x.Current.ClassName 25))) } catch { break } }
+  ($r -join ' < ')
+}
+# Vía para cambiar de informe según el tipo del ítem (tabla medida en Qt 5.15). si | si-menu | quizas | no
+function Via-Item([string]$tipo, [string[]]$pp, [string]$tipoCont, [string]$claseCont) {
+  if ($tipoCont -eq 'ComboBox' -or $claseCont -match 'QComboBox') { return @('no', 'opción de combo: Qt 5 no cambia un combo por UI Automation (probado 23-11)') }
+  switch ($tipo) {
+    'TabItem' { if ($pp -contains 'Invoke') { return @('si', 'pestaña: Invoke la cambia sin mouse (probado en Qt 5.15)') } }
+    'MenuItem' { if ($pp -contains 'Invoke') { return @('si-menu', 'opción de menú: Invoke la ejecuta; el menú se abre en pantalla un instante') } }
+    { $_ -in 'Button', 'RadioButton' } { if ($pp -contains 'Invoke') { return @('si', 'botón: Invoke lo pulsa sin mouse') } }
+    'ListItem' { if ($pp -contains 'SelectionItem') { return @('quizas', 'ítem de lista: Select cambia solo la selección (en Qt 5.15 no cambia el ítem actual ni simula clic); sirve si Matrix carga el informe al cambiar la selección, y eso solo se sabe probándolo una vez') } }
+    { $_ -in 'TreeItem', 'DataItem' } { return @('no', 'ítem de árbol: Qt 5 no deja elegirlo por UI Automation (ni Select ni Invoke lo cambian)') }
+  }
+  return @('no', ('{0} sin la acción necesaria (patrones: {1})' -f $tipo, $(if ($pp) { $pp -join ',' } else { 'ninguno' })))
+}
+if (-not $procs -or -not $uia) { F '(sin dato)' }
+else {
+  $RW = [System.Windows.Automation.TreeWalker]::RawViewWalker
+  $orden = @{ 'si' = 4; 'si-menu' = 3; 'quizas' = 2; 'no' = 1; 'menu-cerrado' = 0; 'ninguno' = -1 }
+  $vistos = 0; $menusCerrados = New-Object System.Collections.Generic.List[string]
+  $candidatos = New-Object System.Collections.Generic.List[object]
+  foreach ($grupo in @($contSel, $combos, $botSel)) { foreach ($x in $grupo) { $candidatos.Add($x) } }
+  foreach ($e in $candidatos) {
+    try { $c = $e.Current; $tipoC = $c.ControlType.ProgrammaticName -replace '^ControlType\\.', '' } catch { continue }
+    $acc = @{ visitas = 0; items = (New-Object System.Collections.Generic.List[object]) }
+    if ($tipoC -match '^(Button|SplitButton|Hyperlink|RadioButton)$') { $acc.items.Add(@{ el = $e; tipo = $tipoC; nombre = [string]$c.Name }) } else { Items-De $e 0 $acc }
+    $infs = @($acc.items | Where-Object { $_.nombre -match $reInforme })
+    if ($tipoC -eq 'MenuBar') {
+      foreach ($m in $acc.items) { if ($m.tipo -eq 'MenuItem' -and $m.nombre -match $reMenuInf) { $menusCerrados.Add((Corto $m.nombre 30)) } }
+    }
+    if ($infs.Count -eq 0) { continue }
+    $vistos++
+    $ppC = Patrones-De $e
+    F ("- {0} «{1}» clase={2} id={3} {{{4}}}{5}{6}" -f $tipoC, (Corto $c.Name 40), (Corto $c.ClassName 25), (Corto $c.AutomationId 30), ($ppC -join ','), $(if ($c.IsOffscreen) { ' (fuera de pantalla)' } else { '' }), $(if (-not $c.IsEnabled) { ' (deshabilitado)' } else { '' }))
+    F ('    dentro de: ' + (Padres-De $e))
+    F ("    informes en él ({0} de {1} ítems): {2}" -f $infs.Count, $acc.items.Count, ((@($infs | ForEach-Object { Corto $_.nombre 30 }) | Select-Object -First 12) -join ' | '))
+    $actual = ''
+    try { $actual = (@($e.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection() | ForEach-Object { $_.Current.Name }) -join ', ') } catch {}
+    if (-not $actual) { foreach ($it in $acc.items) { try { if ($it.el.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) { $actual = $it.nombre; break } } catch {} } }
+    if (-not $actual -and $tipoC -eq 'Tab' -and $c.Name -match $reInforme) { $actual = [string]$c.Name }   # Qt: la barra de pestañas se llama como la pestaña actual
+    if (-not $actual -and $tipoC -eq 'ComboBox') { try { $actual = $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value } catch {} }
+    F ('    elegido ahora: ' + $(if ($actual) { Corto $actual 40 } else { 'no se puede leer' }))
+    $obj = @($infs | Where-Object { $_.nombre -match '(?i)puerta\\s*0' })[0]
+    if (-not $obj) { $obj = $infs[0] }
+    $ppI = Patrones-De $obj.el
+    $via = Via-Item $obj.tipo $ppI $tipoC ([string]$c.ClassName)
+    F ("    «{0}»: {1} {{{2}}} -> {3}" -f (Corto $obj.nombre 30), $obj.tipo, ($ppI -join ','), $via[1])
+    if ($orden[$via[0]] -gt $orden[$st.sel]) { $st.sel = $via[0]; $st.selTxt = ('{0} {1}' -f $tipoC, (Corto $c.ClassName 20)); $st.selActual = Corto $actual 30 }
+  }
+  if ($vistos -eq 0) {
+    if ($menusCerrados.Count) { $st.sel = 'menu-cerrado'; $st.selTxt = ($menusCerrados -join ', '); F ('No se vio el selector. Hay menú(s) que pueden tenerlo: ' + $st.selTxt + '. Sus opciones no se ven sin abrirlo (la sonda no lo abre): saca una foto del menú abierto.') }
+    else { F 'No se vio ningún control con nombres de informes. Saca una foto de la pantalla completa de Matrix, con la lista de informes a la vista.' }
+    if ($st.cortado) { F ("OJO: la lectura se cortó ({0}): el selector puede estar en lo que no se leyó." -f $st.cortado) }
+  }
+}
+
 T '6. VEREDICTO'
 if (-not $procs) { F 'Sin dato: Matrix no estaba abierto.' }
 elseif (-not $uia) { F 'Sin dato: este PowerShell no pudo cargar UI Automation.' }
@@ -217,6 +304,14 @@ switch ($st.combo) {
   'sin-opciones' { F 'Periodo: las opciones no se ven sin desplegar el combo (la sonda no lo despliega). Eso NO significa que no haya periodo relativo: saca una foto del combo de periodo desplegado y mándala.' }
   'sin-periodo' { F ('Periodo: ningún combo parece de periodo (no se leyó «Usuario definido»). Revisa la lista de la sección 5 y saca una foto del combo de periodo desplegado.' + $(if ($otrasRel.Count) { ' Opciones relativas en otros combos: ' + (($otrasRel | Select-Object -First 4) -join '; ') + '.' } else { '' })) }
   'ninguno' { F 'Periodo: sin dato, no se vio ningún combo.' }
+}
+switch ($st.sel) {
+  'si' { F ("Informes: el selector ({0}) se puede cambiar sin mouse ni teclado. Un lector podría leer «Puerta 0» y volver a «Pieza pieza Grader»; cambiar el informe cambia lo que ve quien mire Matrix." -f $st.selTxt) }
+  'si-menu' { F ("Informes: se eligen desde un menú ({0}). Se puede sin teclado, pero el menú se abre en pantalla un instante." -f $st.selTxt) }
+  'quizas' { F ("Informes: el selector es una lista ({0}). UI Automation solo cambia su selección: hay que probar una vez, con OK, si Matrix carga el informe así." -f $st.selTxt) }
+  'no' { F ("Informes: el selector ({0}) no se puede cambiar por UI Automation en Qt 5. Leer «Puerta 0» exige que alguien lo elija a mano." -f $st.selTxt) }
+  'menu-cerrado' { F ("Informes: sin dato. Pueden estar en el menú «{0}»: foto del menú abierto." -f $st.selTxt) }
+  'ninguno' { F 'Informes: sin dato, no se vio el selector. Foto de la pantalla completa de Matrix.' }
 }
 if ($st.licencia) { F 'OJO: hay texto de licencia en pantalla. Revisa el archivo antes de enviarlo.' }
 
@@ -277,6 +372,8 @@ $res8.Add('Matrix: ' + $(if (-not $procs) { 'NO abierto' } elseif (-not $uia) { 
 $perTxt = switch ($st.combo) { 'relativo' { 'HAY opción relativa' } 'sin-relativo' { 'sin opción relativa' } 'sin-opciones' { 'opciones no visibles: foto del combo desplegado' } 'sin-periodo' { 'no se halló el combo de periodo' } default { 'sin dato' } }
 $res8.Add('Periodo: ' + $perTxt + $(if ($st.perVisto) { ' | valor "' + $st.perValor + '"' } else { '' }))
 if ($st.perVisto -and @($st.perOps).Count) { $res8.Add('Opciones: ' + (Corto (@($st.perOps) -join '; ') 160)) }
+$selTxt8 = switch ($st.sel) { 'si' { 'se puede cambiar sin mouse' } 'si-menu' { 'por menú, sin teclado (se ve el menú)' } 'quizas' { 'lista: probar una vez con OK' } 'no' { 'no se puede por UIA' } 'menu-cerrado' { 'foto del menú abierto' } default { 'no visto: foto de Matrix' } }
+$res8.Add('Selector de informes: ' + $selTxt8 + $(if ($st.selTxt -and $st.sel -ne 'menu-cerrado') { ' | ' + $st.selTxt } else { '' }) + $(if ($st.selActual) { ' | elegido "' + $st.selActual + '"' } else { '' }))
 if (-not $lec.hay) { $res8.Add('Lector: no instalado en este usuario') }
 else {
   $res8.Add(('Lector: {0} | latido {1} | proceso {2} | tarea {3}' -f $(if ($lec.ver) { $lec.ver } else { '?' }), $(if ($null -ne $lec.latMin) { "hace $($lec.latMin) min" } else { 'nunca' }), $lec.vivo, $lec.tarea))

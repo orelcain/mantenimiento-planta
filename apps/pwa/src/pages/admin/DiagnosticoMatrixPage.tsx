@@ -309,7 +309,7 @@ export function DiagnosticoMatrixPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Revisa si Matrix se puede manejar sin mouse ni teclado, qué opciones trae el selector de periodo y cómo está el lector del espejo en este PC. La sonda solo lee: no pulsa ni cambia nada en Matrix.
+            Revisa si Matrix se puede manejar sin mouse ni teclado, qué opciones trae el selector de periodo, si el selector de informes se podría pasar a «Puerta 0» sin tocar el PC y cómo está el lector del espejo en este PC. La sonda solo lee: no pulsa ni cambia nada en Matrix.
           </p>
           <Button
             size="sm"

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.23.7' as const
+export const APP_VERSION = '4.24.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-24' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader del monitor: «¿Cuánto llevamos?» con hora a hora, velocidad promedio y mejor/peor hora' as const
+export const VERSION_NAME = 'Sonda: selector de informes de Matrix (¿se puede pasar a Puerta 0 sin mouse?)' as const
 
 /**
  * Nota:
