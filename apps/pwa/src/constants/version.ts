@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.22.0' as const
+export const APP_VERSION = '4.23.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-11-23' as const
+export const VERSION_DATE = '2026-11-24' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Pestaña Grader del monitor: mejoras del video de Orel (alertas por nivel, minuto exacto, sin swipe)' as const
+export const VERSION_NAME = 'Pestaña Grader del monitor: hoja por gate, historial de cambios, campana de peso y matriz calibre × calidad' as const
 
 /**
  * Nota:
