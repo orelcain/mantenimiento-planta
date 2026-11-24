@@ -106,7 +106,7 @@ export interface EntradaAlertas {
   umbrales?: Partial<UmbralesAlertas>
 }
 
-export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio' | 'rafaga-fotocelula'
+export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio' | 'rafaga-fotocelula' | 'fuera-de-rango'
 
 export interface AlertaGrader {
   regla: ReglaAlerta
