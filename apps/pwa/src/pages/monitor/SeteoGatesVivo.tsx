@@ -6,9 +6,10 @@
  * Sin la columna «En la app»: la comparación con el seteo guardado y «Adoptar» van al cierre, en Análisis de turno.
  * Las cuentas viven en `services/grader/espejo/seteoGatesVivo.ts`; aquí solo se dibuja.
  */
-import { Fish, SlidersHorizontal } from 'lucide-react'
+import { ChevronRight, History, Info, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { coma1, milesPunto } from '@/services/grader/espejo/alertasGrader'
+import { textoGates, type CambioConEfecto, type LadoCambio } from '@/services/grader/espejo/historialGatesVivo'
 import {
   EJE_PESO_KG,
   GATE_APAGADA_MIN,
@@ -18,24 +19,24 @@ import {
   type Solape,
 } from '@/services/grader/espejo/seteoGatesVivo'
 import { Tarjeta } from './TarjetaVivo'
+import { Icono } from './AmpliarV2'
+import { coma2, hhmm, kg2, sinLb } from './formatoGateVivo'
 
 const IC = 'h-3.5 w-3.5'
-const kg2 = (v: number) => v.toFixed(2).replace('.', ',') // decimal-tecnico: ya pasa a coma
-const hhmm = (ts: string) => ts.slice(11, 16)
-/** «8-10 lb · Industrial» → «8-10 Industrial», para frases. */
-const sinLb = (p: string) => p.replace(/ lb · /g, ' ').replace(/ lb/g, '')
 const [EJE_MIN, EJE_MAX] = EJE_PESO_KG
 const enEje = (kg: number) => Math.min(100, Math.max(0, ((kg - EJE_MIN) / (EJE_MAX - EJE_MIN)) * 100))
 const TICKS = Array.from({ length: EJE_MAX - EJE_MIN + 1 }, (_, i) => EJE_MIN + i)
 
 /** Pill chica de estado (tinte vivo solo en superficie chica). */
-function Marca({ children, tono = 'atento' }: { children: React.ReactNode; tono?: 'atento' | 'gris' }) {
+export function Marca({ children, tono = 'atento' }: { children: React.ReactNode; tono?: 'atento' | 'gris' | 'acento' }) {
   return (
     <span
       className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-px text-[11px] font-semibold leading-[16px]"
       style={tono === 'atento'
         ? { background: 'color-mix(in srgb, var(--v2-atento) 18%, transparent)', color: 'var(--v2-atento-texto)' }
-        : { background: 'rgb(142 142 147 / 0.16)', color: 'rgb(var(--muted-foreground))' }}
+        : tono === 'acento'
+          ? { background: 'color-mix(in srgb, var(--v2-acento) 14%, transparent)', color: 'var(--v2-acento)' }
+          : { background: 'rgb(142 142 147 / 0.16)', color: 'rgb(var(--muted-foreground))' }}
     >
       {children}
     </span>
@@ -110,11 +111,94 @@ function textoSolapes(s: SeteoVivo): string | null {
   }).join(' ')
 }
 
+/** El renglón tocable de una gate en el celular: abre su detalle; sin acción es un simple bloque. */
+function Tocable({ onClick, etiqueta, children }: { onClick?: () => void; etiqueta: string; children: React.ReactNode }) {
+  if (!onClick) return <div className="px-3 py-2.5">{children}</div>
+  return (
+    <button type="button" onClick={onClick} aria-label={etiqueta} className="block min-h-[44px] w-full rounded-card px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--v2-acento)_8%,transparent)]">
+      {children}
+    </button>
+  )
+}
+
+const INFO_CAMBIOS = 'Antes y después: 60 minutos con producción a cada lado del cambio. P0 = piezas a Gate 0 sobre las leídas. pz/min por gate: las piezas del programa nuevo, entre las gates que lo tenían. Un cambio se confirma a las 100 piezas.'
+
+const pzMin = (v: number | null) => (v === null ? '—' : coma1(v))
+
+function Comparacion({ e }: { e: CambioConEfecto }) {
+  const { antes, despues } = e
+  if (!antes || !despues) {
+    return <p className="mt-2.5 text-footnote text-muted-foreground">Antes y después aparece con 10 minutos de producción a cada lado del cambio.</p>
+  }
+  const cal = (et: string) => sinLb(et.split(' · ')[0] ?? et)
+  const mismoCalibre = cal(e.cambio.antes) === cal(e.cambio.despues)
+  const minutos = Math.min(antes.minutos, despues.minutos)
+  const fila = (rotulo: React.ReactNode, a: string, d: string, unidad?: string, nota?: string) => (
+    <>
+      <span>{rotulo}{nota && <span className="ml-1 text-nota text-muted-foreground">{nota}</span>}</span>
+      <b className="text-right text-subhead">{a}</b>
+      <span aria-hidden className="text-center text-muted-foreground">→</span>
+      <b className="text-subhead">{d}{unidad && <span className="ml-1 text-nota font-normal text-muted-foreground">{unidad}</span>}</b>
+    </>
+  )
+  const p0 = (l: LadoCambio) => (l.p0Pct === null ? '—' : `${coma2(l.p0Pct)} %`)
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-[1fr_auto_16px_auto] items-baseline gap-x-2 gap-y-1.5 text-footnote tabular-nums" data-testid="comparacion-cambio">
+        <span className="text-nota text-muted-foreground">de {milesPunto(antes.piezas)} y {milesPunto(despues.piezas)} pz{minutos < 60 ? ` · ${minutos} min` : ''}</span>
+        <span className="text-right text-nota text-muted-foreground">antes</span>
+        <span />
+        <span className="text-nota text-muted-foreground">después</span>
+        {fila('P0', p0(antes), p0(despues), undefined, `${antes.p0Piezas} y ${despues.p0Piezas} pz`)}
+        {e.gatesNuevo.length > 0 && fila(`${cal(e.cambio.despues)} por gate`, pzMin(antes.pzMinNuevo), pzMin(despues.pzMinNuevo), 'pz/min')}
+        {!mismoCalibre && e.gatesViejo.length > 0 && fila(textoGates(e.gatesViejo), pzMin(antes.pzMinViejo), pzMin(despues.pzMinViejo), 'pz/min')}
+      </div>
+      <p className="mt-2.5 text-footnote tabular-nums">
+        {cal(e.cambio.despues)} en {e.gatesNuevoDespues.length} {e.gatesNuevoDespues.length === 1 ? 'gate' : 'gates'};{' '}
+        {e.p0 === 'igual' ? 'P0 igual' : e.p0 === 'sube' ? `P0 subió de ${p0(antes)} a ${p0(despues)}` : e.p0 === 'baja' ? `P0 bajó de ${p0(antes)} a ${p0(despues)}` : 'P0 sin comparar'}.
+      </p>
+    </>
+  )
+}
+
+/** Cambios de programa del turno, cada uno con lo que pasó antes y después. */
+function CambiosDelTurno({ efectos }: { efectos: readonly CambioConEfecto[] }) {
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--v2-reja)' }} data-testid="cambios-turno">
+      <div className="mb-2 flex items-center gap-2">
+        <Icono><History className="h-3.5 w-3.5" /></Icono>
+        <h4 className="flex-1 text-[15px] font-medium leading-tight text-foreground">Cambios del turno</h4>
+        <details className="relative">
+          <summary className="-my-3 -mr-3 grid h-11 w-11 cursor-pointer list-none place-items-center text-muted-foreground [&::-webkit-details-marker]:hidden" aria-label="Cómo se mide"><Info aria-hidden className="h-4 w-4" /></summary>
+          <p className="absolute right-0 z-10 mt-1 w-[min(300px,80vw)] rounded-card bg-card p-3 text-footnote text-muted-foreground shadow-lg">{INFO_CAMBIOS}</p>
+        </details>
+      </div>
+      {efectos.length === 0 && <p className="text-footnote text-muted-foreground">Ninguno: cada gate tiene el programa con que arrancó.</p>}
+      <ul className="space-y-2">
+        {efectos.map((e) => (
+          <li key={`${e.cambio.gate}-${e.cambio.desdeTs}`} className="v2-subtarjeta rounded-card px-3.5 py-3" data-gate={e.cambio.gate} data-estado={e.cambio.estado}>
+            <div className="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
+              <b className="text-subhead tabular-nums">{hhmm(e.cambio.desdeTs)} · G{e.cambio.gate}</b>
+              {e.cambio.estado === 'confirmado' ? <Marca tono="acento">confirmado</Marca> : <Marca>sin confirmar · {milesPunto(e.cambio.piezas)} de 100 pz</Marca>}
+            </div>
+            <p className="mt-0.5 text-footnote tabular-nums">{sinLb(e.cambio.antes)} <span className="text-muted-foreground">→</span> <b>{sinLb(e.cambio.despues)}</b></p>
+            {e.cambio.estado === 'provisional'
+              ? <p className="mt-2.5 text-footnote text-muted-foreground">Antes y después aparece al confirmar.</p>
+              : <Comparacion e={e} />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 /** Arriba: las 12 gates a la vista, con la última hora como cifra principal. */
-export function SeteoGates({ s }: { s: SeteoVivo }) {
-  const sub = `Lo que dice la máquina, leído de las piezas · última hora ${s.hora.desde}–${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
+export function SeteoGates({ s, efectos = [], onAbrirGate }: { s: SeteoVivo; efectos?: readonly CambioConEfecto[]; onAbrirGate?: (gate: number) => void }) {
+  // Con menos de una hora de grader, «última hora 20:58–21:58» parecía otro turno (video 23-11): se dice cuánto lleva.
+  const sub = s.minutosActivosHora < 55
+    ? `Lo que dice la máquina, leído de las piezas · grader hasta las ${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
+    : `Lo que dice la máquina, leído de las piezas · última hora del grader ${s.hora.desde}–${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
   const solape = textoSolapes(s)
-  const cambios = s.cambios
   const g0 = s.gate0
   return (
     <Tarjeta titulo="Seteo de las gates" sub={sub} icono={<SlidersHorizontal className={IC} />} >
@@ -132,8 +216,10 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
           </thead>
           <tbody>
             {s.gates.map((g) => (
-              <tr key={g.gate} className={cn('border-t border-border/60', g.apagada && 'opacity-50')} data-gate={g.gate} data-apagada={g.apagada || undefined}>
-                <td className="py-2 pr-3 font-semibold text-foreground">G{g.gate}</td>
+              <tr key={g.gate} className={cn('border-t border-border/60', g.apagada && 'opacity-50', onAbrirGate && 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--v2-acento)_8%,transparent)]')} data-gate={g.gate} data-apagada={g.apagada || undefined} onClick={onAbrirGate ? () => onAbrirGate(g.gate) : undefined}>
+                <td className="py-2 pr-3 font-semibold text-foreground">
+                  {onAbrirGate ? <button type="button" aria-label={`Abrir el detalle de la gate ${g.gate}`} className="inline-flex min-h-[44px] items-center gap-1" onClick={(e) => { e.stopPropagation(); onAbrirGate(g.gate) }}>G{g.gate}<ChevronRight aria-hidden className="h-3.5 w-3.5 text-muted-foreground" /></button> : <>G{g.gate}</>}
+                </td>
                 <td className="py-2 pr-3 text-foreground">
                   <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="whitespace-nowrap">{g.programa ?? 'Sin piezas'}</span>
@@ -142,7 +228,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right">
                   <span className="text-[15px] font-semibold text-foreground">{coma1(g.pzMinHora)}</span>{' '}
-                  <span className="text-[12px] text-muted-foreground">turno {coma1(g.pzMinTurno)}</span>
+                  <span className="text-[12px] text-muted-foreground">turno {coma1(g.pzMinTurno)} pz/min</span>
                 </td>
                 <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g.pctHora)} %</td>
                 <td className="py-2">
@@ -151,14 +237,16 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                 </td>
               </tr>
             ))}
-            <tr className="border-t-2 border-border" data-gate={0}>
-              <td className="py-2 pr-3 font-semibold text-foreground">G0</td>
+            <tr className={cn('border-t-2 border-border', onAbrirGate && 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--v2-acento)_8%,transparent)]')} data-gate={0} onClick={onAbrirGate ? () => onAbrirGate(0) : undefined}>
+              <td className="py-2 pr-3 font-semibold text-foreground">
+                {onAbrirGate ? <button type="button" aria-label="Abrir el detalle de Gate 0" className="inline-flex min-h-[44px] items-center gap-1" onClick={(e) => { e.stopPropagation(); onAbrirGate(0) }}>G0<ChevronRight aria-hidden className="h-3.5 w-3.5 text-muted-foreground" /></button> : <>G0</>}
+              </td>
               <td className="py-2 pr-3 text-foreground">
                 Rechazo <span className="text-[12px] text-muted-foreground">P0 {coma1(g0.pctHora)} % última hora · {milesPunto(g0.piezasTurno)} pz en el turno</span>
               </td>
               <td className="whitespace-nowrap py-2 pr-3 text-right">
                 <span className="text-[15px] font-semibold text-foreground">{coma1(g0.pzMinHora)}</span>{' '}
-                <span className="text-[12px] text-muted-foreground">turno {coma1(g0.pzMinTurno)}</span>
+                <span className="text-[12px] text-muted-foreground">turno {coma1(g0.pzMinTurno)} pz/min</span>
               </td>
               <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g0.pctHora)} %</td>
               <td className="py-2">
@@ -173,88 +261,37 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
       {/* Celular: una tarjeta por gate. */}
       <ul className="mt-3 space-y-2 md:hidden" aria-label="Las 12 gates" data-testid="seteo-tarjetas">
         {s.gates.map((g) => (
-          <li key={g.gate} className={cn('v2-subtarjeta rounded-card px-3 py-2.5', g.apagada && 'opacity-55')} data-gate={g.gate}>
+          <li key={g.gate} className={cn('v2-subtarjeta rounded-card', g.apagada && 'opacity-55')} data-gate={g.gate}>
+            <Tocable onClick={onAbrirGate ? () => onAbrirGate(g.gate) : undefined} etiqueta={`Abrir el detalle de la gate ${g.gate}`}>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] leading-[20px]">
               <b className="font-semibold tabular-nums text-foreground">G{g.gate}</b>
               <span className="text-foreground">{g.programa ?? 'Sin piezas'}</span>
               <MarcaGate g={g} />
             </div>
             <p className="mt-1 text-[13px] leading-[18px] tabular-nums text-foreground">
-              <b className="font-semibold">{coma1(g.pzMinHora)} pz/min</b> · {coma1(g.pctHora)} % <span className="text-muted-foreground">· turno {coma1(g.pzMinTurno)}</span>
+              <b className="font-semibold">{coma1(g.pzMinHora)} pz/min</b> · {milesPunto(g.piezasHora)} pz · {coma1(g.pctHora)} % de la salida <span className="text-muted-foreground">· turno {coma1(g.pzMinTurno)} pz/min</span>
             </p>
             <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} programa={rangoProgramaKg(g.programa)} className="mt-2" />
             <p className="mt-1 text-[12px] leading-[16px] tabular-nums text-muted-foreground">Peso {rangoTxt(g.pesoKg)} kg</p>
+            </Tocable>
           </li>
         ))}
-        <li className="v2-subtarjeta rounded-card px-3 py-2.5" data-gate={0}>
+        <li className="v2-subtarjeta rounded-card" data-gate={0}>
+          <Tocable onClick={onAbrirGate ? () => onAbrirGate(0) : undefined} etiqueta="Abrir el detalle de Gate 0">
           <div className="text-[15px] leading-[20px]"><b className="font-semibold text-foreground">G0</b> <span className="text-foreground">Rechazo</span></div>
           <p className="mt-1 text-[13px] leading-[18px] tabular-nums text-foreground">
             <b className="font-semibold">P0 {coma1(g0.pctHora)} %</b> última hora · {milesPunto(g0.piezasTurno)} pz en el turno
           </p>
           <EjePeso rango={g0.pesoKg} solapes={s.solapes} mal className="mt-2" />
           <p className="mt-1 text-[12px] leading-[16px] tabular-nums text-muted-foreground">Peso {rangoTxt(g0.pesoKg)} kg</p>
+          </Tocable>
         </li>
       </ul>
 
       <p className="mt-3 text-[12px] leading-[16px] text-muted-foreground">
         {solape ? `${solape} ` : ''}Gate gris: sin piezas leídas hace {GATE_APAGADA_MIN} min o más, programa sin confirmar. pz/min por minuto con producción del grader.
       </p>
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-border/60 pt-3 text-[13px] leading-[18px]" data-testid="cambios-turno">
-        <span className="font-semibold text-foreground">Cambios del turno</span>
-        {cambios.length === 0 && <span className="text-muted-foreground">Ninguno: cada gate tiene el programa con que arrancó.</span>}
-        {cambios.map((c) => (
-          <span key={`${c.gate}-${c.desdeTs}`} className="tabular-nums text-foreground/80">
-            <span className="font-semibold text-foreground">{hhmm(c.desdeTs)}</span> G{c.gate}: {sinLb(c.antes)} → {sinLb(c.despues)}
-            {c.estado === 'provisional' && <span className="text-muted-foreground"> (sin confirmar)</span>}
-          </span>
-        ))}
-      </div>
-      <p className="mt-1.5 text-[12px] leading-[16px] text-muted-foreground">La comparación con el seteo de la app y «Adoptar» van al cierre, en Análisis de turno.</p>
-    </Tarjeta>
-  )
-}
-
-const gatesTxt = (gs: SeteoVivo['programas'][number]['gates']) =>
-  gs.map((g) => `G${g.gate}${g.desde ? ` desde ${hhmm(g.desde)}` : ''}${g.hasta ? ` hasta ${hhmm(g.hasta)}` : ''}`).join(' · ')
-
-/** Debajo: la pesca del turno por programa y la sugerencia (con su costo en P0). */
-export function PescaPorPrograma({ s, publico = false }: { s: SeteoVivo; publico?: boolean }) {
-  // La sugerencia está en prueba: solo admin la ve.
-  const sg = publico ? null : s.sugerencia
-  return (
-    <Tarjeta titulo="Pesca por programa" sub={`Turno hasta las ${s.hora.hasta} · salida sin Gate 0`} icono={<Fish className={IC} />}>
-      <div className="mt-3 space-y-3" role="list" aria-label="Pesca por programa">
-        {s.programas.map((p) => (
-          <div key={p.programa} role="listitem" className="grid gap-x-4 gap-y-1 text-[13px] leading-[18px] md:grid-cols-[minmax(170px,1.2fr)_2fr_minmax(170px,1fr)] md:items-center">
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground">{p.grupo ? 'Poco flujo (bajo 1 pz/min por gate)' : p.programa}</p>
-              <p className="text-[12px] leading-[16px] tabular-nums text-muted-foreground">{gatesTxt(p.gates)}</p>
-            </div>
-            <span className="block h-2.5 overflow-hidden rounded-full bg-muted">
-              <span className="block h-full rounded-full" style={{ width: `${Math.min(100, p.pct)}%`, background: p.grupo ? 'var(--v2-gris)' : 'var(--v2-acento)' }} />
-            </span>
-            <p className="tabular-nums text-foreground md:text-right">
-              <b className="font-semibold">{coma1(p.pct)} %</b>
-              <span className="text-muted-foreground"> · {p.grupo ? `hasta ${coma1(p.pzMinGate)}` : coma1(p.pzMinGate)} pz/min{p.gates.length > 1 && !p.grupo ? ' c/u' : ''}</span>
-            </p>
-          </div>
-        ))}
-      </div>
-      {sg && (
-        <div className="v2-subtarjeta mt-4 space-y-1.5 rounded-card px-3 py-3" data-testid="sugerencia-gates">
-          <p className="text-[12px] font-semibold leading-[16px] text-muted-foreground">Sugerencia, no acción · en prueba</p>
-          <p className="text-[15px] leading-[21px] text-foreground tabular-nums">
-            <b className="font-semibold">{sg.pocoFlujo.gates} gates reciben el {coma1(sg.pocoFlujo.pct)} % de la salida y {sg.mucho.gates} gates el {coma1(sg.mucho.pct)} %.</b>{' '}
-            Pasar G{sg.gate} ({sinLb(sg.deProg)}) a {sinLb(sg.aProg)} bajaría {sg.gatesDestino.map((g) => `G${g}`).join(', ')} de {coma1(sg.pzMinAntes)} a ~{coma1(sg.pzMinDespues)} pz/min.
-          </p>
-          <p className="text-[15px] leading-[21px] tabular-nums" style={{ color: sg.costo.piezas > 0 ? 'var(--v2-mal-texto)' : undefined }}>
-            Costo en P0: {sg.costo.piezas > 0
-              ? `sus ${milesPunto(sg.costo.piezas)} piezas ${sinLb(sg.deProg)} del turno quedarían sin gate; si van a Gate 0, el P0 sube de ${coma1(sg.costo.p0Antes)} % a ~${coma1(sg.costo.p0Despues)} %.`
-              : `ninguno: ${sinLb(sg.deProg)} tiene otra gate.`}
-          </p>
-          <p className="text-[12px] leading-[16px] text-muted-foreground">Falta un dato para decidir: cuántas piezas por minuto aguanta una gate.</p>
-        </div>
-      )}
+      <CambiosDelTurno efectos={efectos} />
     </Tarjeta>
   )
 }

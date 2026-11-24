@@ -184,6 +184,23 @@ describe('regla 2: P0 sobre 3,5 % sostenido 15 min', () => {
     expect(a?.detalle).toContain('20 de 520 piezas')
   })
 
+  it('un tramo suelto sobre el umbral es «atento»; sostenido o al doble, «mal» (video 23-11)', () => {
+    const suelto = grader(60, 0)
+    for (let m = 45; m < 60; m++) suelto.pz[m] = 40 // 600
+    for (let i = 0; i < 39; i++) suelto.g0[45 + (i % 15)] = (suelto.g0[45 + (i % 15)] ?? 0) + 1 // 6,5 %
+    expect(reglaP0Alto(entrada({ grader: suelto }), U)?.nivel).toBe('atento')
+
+    const doble = grader(60, 0)
+    for (let m = 45; m < 60; m++) doble.pz[m] = 40
+    for (let i = 0; i < 45; i++) doble.g0[45 + (i % 15)] = (doble.g0[45 + (i % 15)] ?? 0) + 1 // 7,5 %
+    expect(reglaP0Alto(entrada({ grader: doble }), U)?.nivel).toBe('mal')
+
+    const sostenido = grader(60, 0)
+    for (let m = 30; m < 60; m++) sostenido.pz[m] = 40
+    for (let m = 30; m < 60; m++) sostenido.g0[m] = m % 3 === 0 ? 1 : 2 // 25 de 600 en cada tramo: 4,2 % y 4,2 %
+    expect(reglaP0Alto(entrada({ grader: sostenido }), U)?.nivel).toBe('mal')
+  })
+
   it('justo en 3,5 % no salta (es «sobre»)', () => {
     const g = grader(60, 0)
     for (let m = 45; m < 60; m++) g.pz[m] = m < 50 ? 14 : 13 // 200

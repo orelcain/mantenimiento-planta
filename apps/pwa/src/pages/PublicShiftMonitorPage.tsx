@@ -4999,7 +4999,9 @@ function MonitorDelToken() {
   // Swipe: es la interacción natural en el celular, que es donde se abre el QR.
   // Las flechas quedan igual para desktop y accesibilidad.
   const touchX = useRef<number | null>(null)
-  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0]?.clientX ?? null }
+  // En la pestaña Grader no hay swipe: sus gráficos y hojas se recorren con el dedo y el turno cambiaba sin querer
+  // (Orel, video 23-11). Ahí el turno se cambia solo con las flechas.
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = pestana === 'grader' ? null : e.touches[0]?.clientX ?? null }
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchX.current == null) return
     const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current

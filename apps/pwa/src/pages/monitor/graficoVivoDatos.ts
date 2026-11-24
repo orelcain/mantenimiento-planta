@@ -337,7 +337,16 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
     axisLabel: conRotulo
       ? { customValues: marcas, formatter: (x: number) => hm(x), color: tema.textoSuave, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', hideOverlap: true }
       : { show: false },
-    axisPointer: { show: true, snap: false, label: { show: false }, lineStyle: { color: tema.texto, opacity: 0.35 } },
+    // `snap`: la raya cae al centro del minuto (las curvas van en m + 0,5) y el tooltip, la barra tocada y el rótulo
+    // del eje dicen el mismo minuto (Orel, video 23-11: la raya iba al borde y el tooltip decía 21:52 sobre 21:51).
+    axisPointer: {
+      show: true,
+      snap: true,
+      label: conRotulo
+        ? { show: true, formatter: (p: { value: number }) => hm(Math.floor(p.value)), backgroundColor: tema.texto, color: tema.fondo, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', padding: [2, 6], borderRadius: 6 }
+        : { show: false },
+      lineStyle: { color: tema.texto, opacity: 0.35 },
+    },
   })
   const yEje = (gi: number, max: number, pct: boolean) => ({
     type: 'value' as const,

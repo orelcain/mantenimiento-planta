@@ -9,8 +9,12 @@ import { cn } from '@/lib/utils'
 import { coma1, horaDelEje, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
 import type { PiezaP0 } from '@/services/grader/espejo/motivoP0'
+import type { BordeGate } from '@/services/grader/espejo/pescaVivo'
+import type { SeteoVivo } from '@/services/grader/espejo/seteoGatesVivo'
 import { Tarjeta } from './TarjetaVivo'
 import { piezasDeCombo, rotuloCalibres } from './hayQueHacerDatos'
+import { CuerpoGate } from './HojaGateVivo'
+import { armarHojaGate } from './hojaGateDatos'
 import { detalleMinuto, resumenFila, type ArbolP0, type ClaveFila, type FilaArbol } from './porQueP0Datos'
 
 const IC = 'h-3.5 w-3.5'
@@ -18,7 +22,7 @@ const pzDe = (f: FilaArbol) => (f.piezas ? f.piezas.reduce((s, x) => s + x.canti
 const tono = (f: FilaArbol) => (f.dueno === 'mantencion' ? 'var(--v2-mant)' : f.dueno === 'seteo' ? 'var(--v2-ext)' : 'var(--v2-gris)')
 
 /** Qué hoja está abierta. */
-export type HojaP0 = { tipo: 'fila'; clave: ClaveFila } | { tipo: 'combo'; calibres: string[]; calidad: string } | { tipo: 'tramo'; desdeMin: number } | { tipo: 'minuto'; min: number } | null
+export type HojaP0 = { tipo: 'fila'; clave: ClaveFila } | { tipo: 'combo'; calibres: string[]; calidad: string } | { tipo: 'tramo'; desdeMin: number } | { tipo: 'minuto'; min: number } | { tipo: 'gate'; gate: number } | null
 
 function Chip({ tono: t, children }: { tono: string; children: React.ReactNode }) {
   return (
@@ -57,8 +61,8 @@ export function PorQueP0({ a, piezasTurno, hasta, onAbrir }: { a: ArbolP0; pieza
       ) : (
         <div className="mt-3 space-y-3">
           <p className="flex flex-wrap gap-2">
-            <Chip tono="var(--v2-mant)">Mantención {milesPunto(a.mant)} · {pct(a.mant)} %</Chip>
-            <Chip tono="var(--v2-ext)">Seteo {milesPunto(a.seteo)} · {pct(a.seteo)} %</Chip>
+            <Chip tono="var(--v2-mant)">Mantención {milesPunto(a.mant)} pz · {pct(a.mant)} %</Chip>
+            <Chip tono="var(--v2-ext)">Seteo {milesPunto(a.seteo)} pz · {pct(a.seteo)} %</Chip>
             {!a.exacto && <span className="self-center text-[12px] text-muted-foreground">estimado</span>}
           </p>
           <ul className="space-y-0.5" data-testid="arbol-p0">
@@ -125,14 +129,17 @@ function HojaFila({ f, hasta }: { f: FilaArbol; hasta: string }) {
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(48px,35%)_40px] items-center gap-x-2 gap-y-1.5">
           {r.porGate.map((x) => <Barra key={x.gate} rotulo={x.gate} n={milesPunto(x.n)} pct={(x.n / mxG) * 100} color={tono(f)} />)}
         </div>
+        {r.porGate.some((x) => x.gate.includes(' o ')) && (
+          <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">«gate 2 o 3»: las dos tenían su calibre y calidad; la pieza podía ir a cualquiera.</p>
+        )}
       </Seccion>
-      <Seccion titulo="Por hora">
+      <Seccion titulo="Piezas por hora del reloj">
         <div className="flex h-[88px] items-end gap-1">
           {r.porHora.map((x) => (
             <div key={x.hora} className="flex flex-1 flex-col items-center gap-0.5">
-              <span className="text-[12px] tabular-nums text-foreground">{x.n}</span>
+              <span className="text-[12px] tabular-nums text-foreground">{x.n} pz</span>
               <span className="w-full rounded-t-[3px]" style={{ height: `${(x.n / mxH) * 48}px`, background: tono(f) }} />
-              <span className="text-[12px] tabular-nums text-muted-foreground">{x.hora}</span>
+              <span className="text-[12px] tabular-nums text-muted-foreground">{/^\d{1,2}$/.test(String(x.hora)) ? `${String(x.hora).padStart(2, '0')}:00` : x.hora}</span>
             </div>
           ))}
         </div>
@@ -168,7 +175,7 @@ const MOTIVOS: Record<Exclude<FiltroMotivo, ''>, string[]> = {
   tooclose: ['Too close or too long'],
 }
 
-function DetalleMin({ m, gate }: { m: ReturnType<typeof detalleMinuto>; gate: string }) {
+function DetalleMin({ m, gate, onAbrirGate }: { m: ReturnType<typeof detalleMinuto>; gate: string; onAbrirGate?: (g: number) => void }) {
   const mx = Math.max(1, ...m.porGate)
   const p0 = [...m.mant, ...m.seteo].reduce((s, x) => s + x.n, 0)
   const grupo = (titulo: string, t: string, filas: Array<{ rotulo: string; n: number }>) => (
@@ -183,14 +190,23 @@ function DetalleMin({ m, gate }: { m: ReturnType<typeof detalleMinuto>; gate: st
     <div className="space-y-3">
       {m.leidas > 0 && (
         <Seccion titulo="A qué gate fueron">
-          <div className="flex h-[96px] items-end gap-1" role="img" aria-label="Piezas por gate en el minuto">
-            {m.porGate.map((v, g) => (
-              <div key={g} className={cn('flex flex-1 flex-col items-center gap-0.5', gate !== '' && Number(gate) !== g && 'opacity-30')}>
-                <span className="text-[12px] tabular-nums text-foreground">{v || ''}</span>
-                <span className="w-full rounded-t-[3px]" style={{ height: `${Math.max(v ? 2 : 0, (v / mx) * 56)}px`, background: g === 0 ? 'var(--v2-mal)' : 'var(--v2-acento)' }} />
-                <span className="text-[12px] tabular-nums text-muted-foreground">{g === 0 ? 'P0' : g}</span>
-              </div>
-            ))}
+          <div className="flex h-[96px] items-end gap-1" role="group" aria-label="Piezas por gate en el minuto">
+            {m.porGate.map((v, g) => {
+              const cuerpo = (
+                <>
+                  <span className="text-[12px] tabular-nums text-foreground">{v || ''}</span>
+                  <span className="w-full rounded-t-[3px]" style={{ height: `${Math.max(v ? 2 : 0, (v / mx) * 56)}px`, background: g === 0 ? 'var(--v2-mal)' : 'var(--v2-acento)' }} />
+                  <span className="text-[12px] tabular-nums text-muted-foreground">{g === 0 ? 'P0' : g}</span>
+                </>
+              )
+              const clase = cn('flex h-full flex-1 flex-col items-center justify-end gap-0.5', gate !== '' && Number(gate) !== g && 'opacity-30')
+              // Cada columna abre el detalle de su gate: ocupa todo el alto de la sección (el ancho lo da el reparto de 13 columnas).
+              return onAbrirGate ? (
+                <button key={g} type="button" data-gate={g} aria-label={`${g === 0 ? 'Gate 0' : `Gate ${g}`}: ${v} piezas, abrir detalle`} onClick={() => onAbrirGate(g)} className={cn(clase, 'min-h-[44px] rounded-[6px] transition-colors hover:bg-[color-mix(in_srgb,var(--v2-acento)_10%,transparent)]')}>{cuerpo}</button>
+              ) : (
+                <div key={g} className={clase}>{cuerpo}</div>
+              )
+            })}
           </div>
         </Seccion>
       )}
@@ -206,7 +222,7 @@ function DetalleMin({ m, gate }: { m: ReturnType<typeof detalleMinuto>; gate: st
   )
 }
 
-function HojaTramo({ desdeMin, t0Ms, hastaMin, piezas, porPieza, sinLectura }: { desdeMin: number; t0Ms: number; hastaMin: number; piezas: readonly PiezaEspejo[]; porPieza: readonly PiezaP0[]; sinLectura: readonly boolean[] }) {
+function HojaTramo({ desdeMin, t0Ms, hastaMin, piezas, porPieza, sinLectura, onAbrirGate }: { onAbrirGate?: (g: number) => void; desdeMin: number; t0Ms: number; hastaMin: number; piezas: readonly PiezaEspejo[]; porPieza: readonly PiezaP0[]; sinLectura: readonly boolean[] }) {
   const [gate, setGate] = useState('')
   const [motivo, setMotivo] = useState<FiltroMotivo>('')
   const mins = useMemo(() => {
@@ -258,15 +274,19 @@ function HojaTramo({ desdeMin, t0Ms, hastaMin, piezas, porPieza, sinLectura }: {
           )
         })}
       </div>
-      {det[i] && <DetalleMin m={det[i]!} gate={gate} />}
+      {det[i] && <DetalleMin m={det[i]!} gate={gate} onAbrirGate={onAbrirGate} />}
     </div>
   )
 }
 
 /** Las hojas de «Por qué va a P0» y del gráfico. */
-export function HojasP0({ hoja, onCerrar, a, t0Ms, hastaMin, piezas, porPieza, sinLectura, g0, hasta }: {
+export function HojasP0({ hoja, onCerrar, a, t0Ms, hastaMin, piezas, porPieza, sinLectura, g0, hasta, seteo, bordes, onAbrirGate }: {
   hoja: HojaP0
   onCerrar: () => void
+  /** El seteo de las gates y sus bordes: con ellos las columnas de «A qué gate fueron» abren el detalle de la gate. */
+  seteo?: SeteoVivo | null
+  bordes?: readonly BordeGate[]
+  onAbrirGate?: (g: number) => void
   a: ArbolP0
   t0Ms: number
   hastaMin: number
@@ -276,6 +296,9 @@ export function HojasP0({ hoja, onCerrar, a, t0Ms, hastaMin, piezas, porPieza, s
   g0: readonly number[]
   hasta: string
 }) {
+  const gateAbierta = hoja?.tipo === 'gate' ? hoja.gate : null
+  const armada = useMemo(() => (gateAbierta === null || !seteo ? null : armarHojaGate(gateAbierta, seteo, piezas, porPieza, bordes ?? [])), [gateAbierta, seteo, piezas, porPieza, bordes])
+  const abrirGate = seteo ? onAbrirGate : undefined
   let titulo = ''
   let desc = ''
   let cuerpo: React.ReactNode = null
@@ -310,13 +333,17 @@ export function HojasP0({ hoja, onCerrar, a, t0Ms, hastaMin, piezas, porPieza, s
     }
     titulo = `${horaDelEje(t0Ms, hoja.desdeMin)} a ${horaDelEje(t0Ms, Math.min(hastaMin, hoja.desdeMin + 15))}`
     desc = `${milesPunto(tot)} piezas · ${milesPunto(p0)} a P0`
-    cuerpo = <HojaTramo key={hoja.desdeMin} desdeMin={hoja.desdeMin} t0Ms={t0Ms} hastaMin={hastaMin} piezas={piezas} porPieza={porPieza} sinLectura={sinLectura} />
+    cuerpo = <HojaTramo key={hoja.desdeMin} desdeMin={hoja.desdeMin} t0Ms={t0Ms} hastaMin={hastaMin} piezas={piezas} porPieza={porPieza} sinLectura={sinLectura} onAbrirGate={abrirGate} />
   } else if (hoja?.tipo === 'minuto') {
     const m = detalleMinuto(piezas, porPieza, new Date(t0Ms + hoja.min * 60_000).toISOString())
     const p0 = [...m.mant, ...m.seteo].reduce((s, x) => s + x.n, 0)
     titulo = horaDelEje(t0Ms, hoja.min)
     desc = sinLectura[hoja.min] ? 'Sin lectura del espejo en este minuto' : `${milesPunto(m.leidas)} piezas leídas · ${p0} a P0${m.lote ? ` · lote ${m.lote}` : ''}`
-    cuerpo = <DetalleMin m={m} gate="" />
+    cuerpo = <DetalleMin m={m} gate="" onAbrirGate={abrirGate} />
+  } else if (hoja?.tipo === 'gate' && armada) {
+    titulo = armada.titulo
+    desc = armada.desc
+    cuerpo = <CuerpoGate a={armada} />
   }
   return (
     <Sheet open={hoja !== null && cuerpo !== null} onClose={onCerrar} title={titulo} description={desc} surface="grouped">

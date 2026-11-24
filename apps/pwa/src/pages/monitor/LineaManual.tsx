@@ -27,12 +27,18 @@ export function LineaManual({ d, enCurso }: { d: DatosGraderVivo; enCurso: boole
     }
   }, [d, hasta, enCurso])
   const r = resumenTramos(tramos)
+  // La primera hora de reloj completa termina en el primer borde de hora + 60 (como `lineaManualPorHora`).
+  const resto = ((Math.floor(d.serie.t0Ms / 60_000) % 60) + 60) % 60
+  const primeraHasta = (resto === 0 ? 0 : 60 - resto) + 60
+  const faltanPrimera = enCurso && primeraHasta > hasta ? primeraHasta - hasta : null
   return (
     <Tarjeta titulo="Línea manual por hora" sub="Grader menos Baader en cada hora" icono={<Hand className={IC} />}>
       {!d.baader ? (
         <p className="py-6 text-center text-[13px] text-muted-foreground">Sin la serie de las Baader no se puede restar.</p>
       ) : filas.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
+        <p className="py-6 text-center text-[13px] text-muted-foreground tabular-nums">
+          Se calcula al cerrar la primera hora completa del reloj{faltanPrimera !== null ? ` (${horaDelEje(d.serie.t0Ms, primeraHasta)}, faltan ${faltanPrimera} min)` : ''}.
+        </p>
       ) : (
         <>
           <div className="mt-3 grid gap-1.5" data-testid="linea-manual">
