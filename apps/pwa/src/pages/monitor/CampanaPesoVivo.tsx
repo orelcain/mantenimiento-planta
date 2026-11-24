@@ -4,9 +4,9 @@
  * hasta cada hito del turno) sobre los rangos de las gates, y encima se marca la zona compartida. Los bordes de cada
  * gate viven en la hoja de esa gate.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ChartColumn, Info } from 'lucide-react'
-import { milesPunto } from '@/services/grader/espejo/alertasGrader'
+import { coma1, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import { CAMPANA_DESDE_KG, CAMPANA_HASTA_KG, CAMPANA_PASO_KG, ZONA_KG, campanaDelTurno } from '@/services/grader/espejo/campanaPesoVivo'
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
 import type { ZonaCompartida } from '@/services/grader/espejo/pescaVivo'
@@ -43,6 +43,13 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
   const lados = zonaTurno.lados
   const par = lados.length === 2 ? lados : null
   const pct810 = zonaHora.pct810
+  // Barra tocada (o apuntada): su tramo de 100 g, a qué calibre pertenece y cuántas piezas lleva en cada capa.
+  const [sel, setSel] = useState<number | null>(null)
+  const lo = sel === null ? 0 : CAMPANA_DESDE_KG + sel * CAMPANA_PASO_KG
+  const centro = lo + CAMPANA_PASO_KG / 2
+  const banda = sel === null ? undefined : c.bandas.find((b) => centro >= b.desdeKg && (b.hastaKg === null || centro < b.hastaKg))
+  const enZona = sel !== null && centro >= ZONA_KG[0] && centro < ZONA_KG[1]
+  const ahoraSel = sel === null ? 0 : (c.capas[c.capas.length - 1]?.bins[sel] ?? 0)
   return (
     <Tarjeta titulo="Peso del turno" sub={`Salida de las gates 1 a 12 hasta las ${hasta}`} icono={<ChartColumn className={IC} />}>
       {c.capas.length === 0 ? (
@@ -61,8 +68,23 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
                 <rect key={`${capa.rotulo}-${i}`} x={x(CAMPANA_DESDE_KG + i * CAMPANA_PASO_KG) + 1} y={ALTO - alto(v)} width={ancho} height={alto(v)} rx={1.5} style={{ fill: acentoOpaco(ops[idx] ?? 100) }} />
               ))
             })}
-            {c.mediaKg !== null && <line x1={x(c.mediaKg)} x2={x(c.mediaKg)} y1={-4} y2={ALTO} strokeWidth={1} strokeDasharray="3 3" style={{ stroke: 'rgb(var(--foreground))' }} />}
+            {c.capas.length > 0 && Array.from({ length: bins }, (_, i) => (
+              <rect key={`t${i}`} x={x(CAMPANA_DESDE_KG + i * CAMPANA_PASO_KG)} y={-4} width={W / bins} height={ALTO + 4} fill="transparent" style={{ cursor: 'pointer', ...(sel === i ? { fill: 'color-mix(in srgb, var(--v2-acento) 14%, transparent)' } : null) }} onClick={() => setSel(sel === i ? null : i)} onMouseEnter={() => setSel(i)} />
+            ))}
+            {c.mediaKg !== null && <line x1={x(c.mediaKg)} x2={x(c.mediaKg)} y1={-4} y2={ALTO} strokeWidth={1} strokeDasharray="3 3" style={{ stroke: 'rgb(var(--foreground))', pointerEvents: 'none' }} />}
           </svg>
+          <p className="mt-2 min-h-[44px] rounded-[10px] px-3 py-2 text-footnote tabular-nums" style={{ background: FONDO_SUB }} aria-live="polite" data-testid="campana-lectura">
+            {sel === null ? (
+              <span className="text-muted-foreground">Toca una barra para ver cuántas piezas pesan ese tramo de 100 g.</span>
+            ) : (
+              <>
+                <b>{kg2(lo)}–{kg2(lo + CAMPANA_PASO_KG)} kg</b> · {milesPunto(ahoraSel)} pz ({coma1(c.piezas > 0 ? (ahoraSel / c.piezas) * 100 : 0)} % del turno)
+                {banda ? ` · rango de las gates ${banda.rotulo} lb` : ' · sin gate con este calibre'}
+                {enZona ? ' · zona compartida' : ''}
+                <span className="mt-0.5 block text-nota text-muted-foreground">{c.capas.map((capa) => `${capa.rotulo}: ${milesPunto(capa.bins[sel] ?? 0)}`).join(' · ')}</span>
+              </>
+            )}
+          </p>
           <div className="relative mt-1 h-[18px]" aria-hidden>
             {c.bandas.map((b) => {
               const a = Math.max(CAMPANA_DESDE_KG, b.desdeKg)
@@ -70,7 +92,7 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
               if (z <= a) return null
               const w = ((x(z) - x(a)) / W) * 100
               return (
-                <span key={b.rotulo} className="absolute top-0 h-3.5 rounded-full text-center text-[11px] leading-[14px] tabular-nums text-muted-foreground" style={{ left: `${(x(a) / W) * 100}%`, width: `calc(${w}% - 2px)`, background: FONDO_SUB }}>
+                <span key={b.rotulo} className="absolute top-0 h-3.5 rounded-full text-center text-[11px] leading-[14px] tabular-nums text-muted-foreground" style={{ left: `${(x(a) / W) * 100}%`, width: `calc(${w}% - 2px)`, background: FONDO_SUB }} title={`Gates ${b.rotulo} lb: ${kg2(b.desdeKg)}–${b.hastaKg === null ? 'sin tope' : kg2(b.hastaKg)} kg`}>
                   {w >= 9 ? b.rotulo : ''}
                 </span>
               )
@@ -88,6 +110,11 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
               </li>
             ))}
           </ul>
+          <ul className="mt-2 space-y-1 text-nota text-muted-foreground" aria-label="Qué muestra el gráfico" data-testid="campana-explica">
+            <li>Cada barra cuenta las piezas de un tramo de 100 g. Las capas se leen de la más clara a la más oscura: lo leído hasta cada hora; la más clara es todo el turno hasta ahora.</li>
+            <li>Los rótulos grises bajo las barras (por ejemplo 8-10) son el rango de peso de las gates con ese calibre en libras.</li>
+            <li>La línea punteada es el peso medio del turno{c.mediaKg !== null ? `: ${kg2(c.mediaKg)} kg` : ''}.</li>
+          </ul>
           <details className="mt-1 text-footnote text-muted-foreground">
             <summary className="-ml-2 inline-flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 px-2 [&::-webkit-details-marker]:hidden"><Info aria-hidden className="h-4 w-4" />Cómo se lee</summary>
             <p className="pb-1">
@@ -103,6 +130,7 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
                 <span className="flex-1">Zona compartida {kg2(ZONA_KG[0])}–{kg2(ZONA_KG[1])} kg</span>
                 <b>{milesPunto(zonaTurno.piezas)} pz</b>
               </p>
+              <p className="mt-1 text-nota text-muted-foreground">Son piezas Premium que pesan entre esos dos pesos: caben tanto en las gates 8-10 como en las 10-12. Cuál las recibe depende del programa de cada gate, no de la balanza. Franja naranja del gráfico.</p>
               <div className="mt-2 flex h-2.5 gap-0.5" role="img" aria-label={par.map((l) => `${milesPunto(l.piezas)} por gates ${calCorto(l.calibre)}`).join(', ')}>
                 {par.map((l, i) => <i key={l.calibre} className="block rounded-full" style={{ flex: Math.max(l.piezas, 0.001), background: 'var(--v2-acento)', opacity: i === 0 ? 0.55 : 1 }} />)}
               </div>
