@@ -300,3 +300,30 @@ test('vivo: más de 30 min (+1 min de holgura de reloj) no vale', () => {
   assert.strictEqual(espejo.vivoDeControl(AHORA + 31 * 60 * 1000 + 1, AHORA), null)
   assert.strictEqual(espejo.VIVO_MAX_MS, 30 * 60 * 1000)
 })
+
+// ---- e1.10: pedido manual de Puerta 0 y estado propio de Puerta 0 ----
+test('pedido P0: vigente hasta 1 h, con 1 min de holgura hacia adelante; se devuelve como ISO', () => {
+  assert.deepStrictEqual(espejo.pedidoP0Vigente(AHORA - 5 * 60 * 1000, AHORA), { p0Pedido: new Date(AHORA - 5 * 60 * 1000).toISOString() })
+  assert.ok(espejo.pedidoP0Vigente(AHORA, AHORA))
+  assert.ok(espejo.pedidoP0Vigente(AHORA + 60 * 1000, AHORA))
+  assert.strictEqual(espejo.pedidoP0Vigente(AHORA + 60 * 1000 + 1, AHORA), null)
+  assert.ok(espejo.pedidoP0Vigente(AHORA - espejo.PEDIDO_P0_MAX_MS, AHORA))
+  assert.strictEqual(espejo.pedidoP0Vigente(AHORA - espejo.PEDIDO_P0_MAX_MS - 1, AHORA), null)
+})
+
+test('pedido P0: sin documento o mal formado → null', () => {
+  assert.strictEqual(espejo.pedidoP0Vigente(null, AHORA), null)
+  assert.strictEqual(espejo.pedidoP0Vigente(undefined, AHORA), null)
+  assert.strictEqual(espejo.pedidoP0Vigente(Number.NaN, AHORA), null)
+  assert.strictEqual(espejo.pedidoP0Vigente('2026-11-21T14:00:00Z', AHORA), null)
+  assert.strictEqual(espejo.pedidoP0Vigente(AHORA, null), null)
+})
+
+test('estado: un envío de Puerta 0 no pisa el latido de pieza (va en su campo p0)', () => {
+  const base = { equipo: 'PC1', linea: 'chonchi', leidoEn: '2026-11-23T10:00:00-03:00', estado: { p0: 'ok' }, prefijo: 'abcd1234' }
+  const p0 = espejo.camposEstado({ ...base, informe: 'p0' })
+  assert.deepStrictEqual(p0, { equipo: 'PC1', linea: 'chonchi', p0: { leidoEn: base.leidoEn, estado: { p0: 'ok' } }, llave: 'abcd1234' })
+  assert.ok(!('estado' in p0) && !('informe' in p0) && !('leidoEn' in p0))
+  const pz = espejo.camposEstado({ ...base, informe: 'pieza' })
+  assert.deepStrictEqual(pz, { equipo: 'PC1', linea: 'chonchi', leidoEn: base.leidoEn, informe: 'pieza', estado: { p0: 'ok' }, llave: 'abcd1234' })
+})

@@ -19,10 +19,33 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(codigo[codigo.length - 1]).toBe('}')
   })
 
-  it('acciona un único control de Matrix: una sola llamada a Invoke, sobre el botón «Actualizar»', () => {
-    expect(S.match(/\.Invoke\(\)/g)?.length).toBe(1)
-    expect(S).toContain('Boton-Actualizar')
-    expect(S).toContain('InvokePattern')
+  // Cuerpo de una función del lector (hasta su llave de cierre en la columna 0).
+  const fn = (nombre: string): string => {
+    const i = S.indexOf(`\nfunction ${nombre}`)
+    expect(i).toBeGreaterThan(0)
+    return S.slice(i, S.indexOf('\n}\n', i))
+  }
+
+  it('Invoke solo sobre «Actualizar» y (e1.10) sobre el control de nombre exacto «Puerta 0» / «Pieza pieza Grader»', () => {
+    expect(S.match(/\.Invoke\(\)/g)?.length).toBe(3)
+    expect(fn('Ciclo')).toContain('$boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()')
+    expect(fn('Alterna-P0')).toContain('$bot = Boton-Actualizar (Ventana-De $fp.p0.el)')
+    expect(fn('Alterna-P0')).toContain('$bot.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()')
+    const inv = fn('Invoca-Informe')
+    expect(inv).toContain('.Invoke()')
+    // Un solo control de nombre exacto, y solo pestaña, botón u opción de menú (nunca lista, árbol ni combo).
+    expect(inv).toContain('if ($obj.Count -ne 1)')
+    expect(S).toContain("$RE_INF_P0 = '^puerta 0$'")
+    expect(S).toContain("$RE_INF_PIEZA = '^pieza (a )?pieza grader$'")
+    expect(S).toContain("$TIPOS_VIA = @{ 'ControlType.TabItem' = 'pestana'; 'ControlType.Button' = 'boton'; 'ControlType.RadioButton' = 'boton'; 'ControlType.MenuItem' = 'menu' }")
+  })
+
+  it('e1.10: la alternancia está apagada sin ALTERNAR, va solo tras un ciclo sano y vuelve siempre (finally)', () => {
+    const paso = fn('Paso-P0')
+    expect(paso.indexOf('if (-not $cfg.on -or $cfg.bloqueado) {')).toBeLessThan(paso.indexOf('Alterna-P0 '))
+    expect(paso.indexOf('if (-not $sano) { return $out }')).toBeLessThan(paso.indexOf('Alterna-P0 '))
+    expect(fn('Alterna-P0')).toMatch(/\} finally \{[\s\S]*Invoca-Informe \$ventana \$r\.via \$RE_INF_PIEZA/)
+    expect(S).toContain("$sanoP0 = ($resp -eq 'ok' -and -not $rec -and $res.lec -and -not $res.lec.parcial -and -not [string]$res.error -and $envioOk -and -not $huecoSigue -and -not $script:bloqueada)")
   })
 
   it('e1.2: escribe solo las 2 fechas del rango, con una única llamada a SetValue', () => {
@@ -39,8 +62,9 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).toContain("'^\\s*Limitar el informe'")
   })
 
-  it('e1.2: la casilla «Limitar» solo se desmarca (Toggle único y solo si está marcada)', () => {
-    expect(S.match(/\.Toggle\(\)/g)?.length).toBe(1)
+  it('e1.2: la casilla «Limitar» solo se desmarca (Toggle solo si está marcada; e1.10 también en «Puerta 0»)', () => {
+    expect(S.match(/\.Toggle\(\)/g)?.length).toBe(2)
+    expect(fn('Desmarca-Limitar')).toContain("if ($lim.Count -ne 1 -or $lim[0].estado -ne 'On') { return }")
     expect(S).toContain("if ((Estado-Casilla $ctl.casilla.el) -eq 'On') {")
     expect(S).toContain('    try { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }')
   })
@@ -57,8 +81,16 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
 
   it('no teclea, selecciona, cierra ni mueve el foco en Matrix', () => {
     expect(S).not.toMatch(
-      /\.Expand\(\)|\.Collapse\(\)|\.Close\(\)|\.SetFocus\(\)|\.ScrollIntoView\(|\.AddToSelection\(|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
+      /\.Close\(\)|\.SetFocus\(\)|\.ScrollIntoView\(|\.AddToSelection\(|SendKeys|SendInput|Set-Clipboard|mouse_event|keybd_event/,
     )
+    // e1.10: Expand solo para abrir el menú de informes de la barra; Collapse solo para cerrarlo si no se usa.
+    expect(S.match(/\.Expand\(\)/g)?.length).toBe(1)
+    expect(fn('Candidatos-Via')).toContain('.Expand()')
+    expect(S.match(/\.Collapse\(\)/g)?.length).toBe(1)
+    expect(fn('Cierra-Menu')).toContain('.Collapse()')
+    // e1.10: solo minimiza las ventanas de Matrix recién abierto por el lector; nunca restaura ni maximiza.
+    expect(S.match(/SetWindowVisualState\(/g)?.length).toBe(1)
+    expect(fn('Minimiza-Matrix')).toContain('SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Minimized)')
   })
 
   it('e1.9: elige el periodo con UNA sola llamada a Select, dentro de Paso-Periodo y solo con el archivo PERIODO', () => {
@@ -77,7 +109,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     // Ya en la opción correcta: no elige.
     expect(cuerpo).toContain("if ($vNorm -eq (Normaliza-Texto $opcion)) { $resultado = 'ya-en' }")
     // Opciones solo del combo cerrado: nunca se despliega para leerlas.
-    expect(S).not.toMatch(/ExpandCollapsePattern/)
+    expect(cuerpo).not.toMatch(/ExpandCollapsePattern/)
+    expect(fn('Combo-Periodo')).not.toMatch(/ExpandCollapsePattern/)
   })
 
   it('e1.9: con fechas de solo lectura o periodo relativo igual desmarca «Limitar» y no escribe fechas', () => {
@@ -108,8 +141,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).not.toMatch(/Stop-Process[^\n]*(matrix|marelec)|CloseMainWindow|taskkill/i)
   })
 
-  it('es la versión e1.9 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.9'"])
+  it('es la versión e1.10 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.10'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
