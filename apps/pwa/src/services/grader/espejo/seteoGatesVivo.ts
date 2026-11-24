@@ -183,6 +183,8 @@ export interface ProgramaPesca {
   /** «G5 · G6 hasta 10:44». */
   gates: Array<{ gate: number; desde: string | null; hasta: string | null }>
   grupo: boolean
+  /** Solo en el grupo «Poco flujo»: los programas que lo forman (para repartirlos por calibre). */
+  miembros?: ProgramaPesca[]
 }
 
 export interface Sugerencia {
@@ -218,6 +220,8 @@ export interface SeteoVivo {
   gates: GateVivo[]
   gate0: Gate0Vivo
   cambios: CambioGate[]
+  /** Los tramos de programa de cada gate (con el provisional ya aplicado): qué gates tenían qué, y cuándo. */
+  tramos: TramoGate[]
   programas: ProgramaPesca[]
   sugerencia: Sugerencia | null
   solapes: Solape[]
@@ -331,6 +335,7 @@ export function seteoGatesVivo(piezas: readonly PiezaEspejo[], referenciaMs?: nu
     gates,
     gate0,
     cambios,
+    tramos,
     programas,
     sugerencia: sugerir(programas, gates, g0t, totTurno, porGate),
     solapes: solapesDeRango(gates),
@@ -399,6 +404,7 @@ export function pescaPorProgramas(piezas: readonly PiezaEspejo[], tramos: readon
       pzMinGate: Math.max(...chicos.map((f) => f.pzMinGate)),
       gates: gatesChicos,
       grupo: true,
+      miembros: chicos,
     })
   } else grandes.push(...chicos)
   return grandes
