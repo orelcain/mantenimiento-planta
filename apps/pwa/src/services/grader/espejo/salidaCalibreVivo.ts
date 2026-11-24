@@ -8,6 +8,9 @@
  */
 import type { ProgramaPesca } from './seteoGatesVivo'
 
+/** Calidades que la matriz muestra siempre, con 0 piezas si no hubo. */
+const CALIDADES_FIJAS = ['Premium', 'Industrial', 'D']
+
 const ORDEN_CALIBRE = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', '12-UP lb']
 
 export interface ParteCalibre {
@@ -85,6 +88,8 @@ export function salidaPorCalibre(programas: readonly ProgramaPesca[]): SalidaCal
   const orden = (x: CalibreSalida, y: CalibreSalida) => y.pct - x.pct || ORDEN_CALIBRE.indexOf(x.calibre) - ORDEN_CALIBRE.indexOf(y.calibre)
   const principales = calibres.filter((c) => !c.pocoFlujo).sort(orden)
   const poco = calibres.filter((c) => c.pocoFlujo).sort((x, y) => ORDEN_CALIBRE.indexOf(y.calibre) - ORDEN_CALIBRE.indexOf(x.calibre))
+  // Las 3 calidades siempre se muestran, aunque una no tenga piezas (decisión de Orel).
+  for (const q of CALIDADES_FIJAS) if (!cal.has(q)) cal.set(q, { piezas: 0, pct: 0 })
   const gs = new Set<number>()
   for (const c of poco) for (const pa of c.partes) for (const g of pa.gates) gs.add(g.gate)
   return {

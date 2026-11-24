@@ -84,7 +84,7 @@ export function CampanaPesoVivo({ piezas, seteo, zonaTurno, zonaHora, hasta, des
           <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-nota tabular-nums text-muted-foreground" aria-label="Capas de la campana">
             {c.capas.map((capa, i) => (
               <li key={capa.rotulo} className="inline-flex items-center gap-1">
-                <i aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ background: acentoOpaco(ops[i] ?? 100) }} />{capa.rotulo} · {milesPunto(capa.piezas)}
+                <i aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ background: acentoOpaco(ops[i] ?? 100), boxShadow: 'inset 0 0 0 1px var(--v2-acento)' }} />{capa.rotulo} · {milesPunto(capa.piezas)}
               </li>
             ))}
           </ul>

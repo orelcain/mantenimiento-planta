@@ -94,6 +94,12 @@ describe('salida por calibre, 18-11 T1 a las 04:30', () => {
     expect(textoGatesParte(c810.partes[1]!.gates)).toBe('G5')
     expect(textoGatesParte(so.principales[1]!.partes[0]!.gates)).toBe('G12, G11 hasta 03:21')
   })
+  it('muestra siempre Premium, Industrial y D, aunque D tenga 0 piezas', () => {
+    const cals = so.calidad.map((q) => q.calidad)
+    expect(cals).toEqual(expect.arrayContaining(['Premium', 'Industrial', 'D']))
+    expect(salidaPorCalibre([]).calidad.map((q) => q.calidad)).toEqual(['Premium', 'Industrial', 'D'])
+    expect(so.calidad.find((q) => q.calidad === 'D')!.piezas).toBeGreaterThanOrEqual(0)
+  })
   it('Premium es la mayor calidad', () => {
     expect(so.calidad[0]!.calidad).toBe('Premium')
     expect(so.calidad[0]!.pct).toBeGreaterThan(95)
