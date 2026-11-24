@@ -30,6 +30,7 @@ import {
   zonaCompartida,
 } from '@/services/grader/espejo/pescaVivo'
 import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
+import { piezasFueraDeRango, VENTANA_FUERA_MIN } from '@/services/grader/espejo/fueraRangoGateVivo'
 import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type ResumenP0 } from '@/services/grader/espejo/motivoP0'
 import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 import { hayQueHacer } from './hayQueHacerDatos'
@@ -93,6 +94,18 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
       detalle: c.estado === 'provisional'
         ? `Venía con ${c.antes}. Lleva ${c.piezas} piezas seguidas del programa nuevo; se confirma con 100.`
         : `Venía con ${c.antes}. Confirmado con 100 piezas; nadie lo registró en la app.`,
+    })
+  }
+  // Piezas fuera del rango de su gate: un par es sugerencia (atento); varias y con peso en la gate, alerta (mal).
+  const refFueraMs = leidoHastaMs != null && Number.isFinite(leidoHastaMs) ? Math.min(leidoHastaMs, finMs) : ultMs
+  for (const f of seteo ? piezasFueraDeRango(pz, seteo.gates, refFueraMs) : []) {
+    const lado = f.lado === 'sobre' ? 'sobre' : 'bajo'
+    avisos.push({
+      regla: 'fuera-de-rango',
+      nivel: f.nivel === 'alerta' ? 'mal' : 'atento',
+      desdeMin: desdeMin(f.desdeTs),
+      titulo: `${f.nivel === 'alerta' ? 'Alerta' : 'Sugerencia'} · G${f.gate} (${f.programa.split(' · ')[0]}): ${f.n} piezas ${lado} ${kg2(f.limiteKg)} kg`,
+      detalle: `En los últimos ${VENTANA_FUERA_MIN} min, ${f.n} de ${f.total} piezas (${Math.round(f.pct)} %) quedaron ${lado} el límite de la gate; la más lejana pesa ${kg2(f.extremoKg)} kg (${(f.extremoKg / 0.453592).toFixed(1).replace('.', ',')} lb). ${f.nivel === 'alerta' ? 'Es una tendencia: revisar el flipper y el seteo de esa gate.' : 'Por ahora son pocas: mirar si se repiten.'}`,
     })
   }
   // Motivo P0 por pieza: exacto con Puerta 0 si hay registros; si no, estimado con el seteo inferido.
