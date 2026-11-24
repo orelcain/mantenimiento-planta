@@ -5,7 +5,8 @@
  * Reglas (umbrales ilustrativos, a validar en terreno):
  *  - Limpiar fotocélula: ≥ 12 piezas de fotocélula en los últimos 15 min (Mantención).
  *  - Revisar gates: el lote en curso es distinto del anterior (±10 % de peso medio o +10 puntos en un calibre).
- *  - Agregar gate: una combinación de calibre y calidad sin gate que ya suma ≥ 50 kg a P0 en el turno.
+ *  - Agregar gate: una combinación de calibre y calidad sin gate que ya suma ≥ 50 kg a P0 en el turno. Con menos de
+ *    {@link ACCION_AGREGAR_PZ} piezas es una «sugerencia», no una acción (Orel, video 23-11: 10 piezas no son alerta).
  *  - Repartir un calibre: ≥ 5 piezas de «puerta no preparada» en 15 min (exige el motivo exacto de Puerta 0).
  * Los últimos 15 min se cuentan hasta la última pieza leída, no hasta el reloj.
  */
@@ -18,6 +19,7 @@ import { aPieza, type PiezaArbol } from './porQueP0Datos'
 export const VENTANA_ACCION_MS = 15 * 60_000
 export const ACCION_FOTO_PZ = RAFAGA_UMBRAL_PZ
 export const ACCION_AGREGAR_KG = 50
+export const ACCION_AGREGAR_PZ = 30
 export const ACCION_PUERTA_PZ = 5
 export const LOTE_PESO_PCT = 10
 export const LOTE_CALIBRE_PTS = 10
@@ -39,6 +41,8 @@ export interface Accion {
   detalle: string
   /** Alguna pieza de la acción no trae su motivo exacto de Puerta 0. */
   estimado: boolean
+  /** «sugerencia»: algo que está pasando pero aún no pide hacer nada (va al final y sin color de dueño). */
+  nivel?: 'sugerencia'
   destino: DestinoAccion
 }
 
@@ -167,6 +171,7 @@ export function hayQueHacer(r: ResumenP0, lote: LoteVivo | null, hastaMs: number
       titulo: `Agregar gate ${rotuloCalibres(c.calibres)} ${c.calidad}`,
       detalle: `${milesPunto(c.pz)} pz · ${coma0(c.kg)} kg fueron a P0 porque ninguna gate recibe ${rotuloCalibres(c.calibres)} ${c.calidad}${c.est ? ' (estimado)' : ''}`,
       estimado: c.est,
+      ...(c.pz < ACCION_AGREGAR_PZ ? { nivel: 'sugerencia' as const } : {}),
       destino: { tipo: 'combo', calibres: c.calibres, calidad: c.calidad },
     })
   }
@@ -189,5 +194,7 @@ export function hayQueHacer(r: ResumenP0, lote: LoteVivo | null, hastaMs: number
     })
   }
 
-  return { acciones, kgMantencion: r.mantencion.kg, kgSeteo: r.seteo.kg }
+  // Las sugerencias al final, en el orden en que salieron.
+  const orden = [...acciones.filter((a) => !a.nivel), ...acciones.filter((a) => a.nivel === 'sugerencia')]
+  return { acciones: orden, kgMantencion: r.mantencion.kg, kgSeteo: r.seteo.kg }
 }

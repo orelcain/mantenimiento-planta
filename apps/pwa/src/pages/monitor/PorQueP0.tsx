@@ -57,8 +57,8 @@ export function PorQueP0({ a, piezasTurno, hasta, onAbrir }: { a: ArbolP0; pieza
       ) : (
         <div className="mt-3 space-y-3">
           <p className="flex flex-wrap gap-2">
-            <Chip tono="var(--v2-mant)">Mantención {milesPunto(a.mant)} · {pct(a.mant)} %</Chip>
-            <Chip tono="var(--v2-ext)">Seteo {milesPunto(a.seteo)} · {pct(a.seteo)} %</Chip>
+            <Chip tono="var(--v2-mant)">Mantención {milesPunto(a.mant)} pz · {pct(a.mant)} %</Chip>
+            <Chip tono="var(--v2-ext)">Seteo {milesPunto(a.seteo)} pz · {pct(a.seteo)} %</Chip>
             {!a.exacto && <span className="self-center text-[12px] text-muted-foreground">estimado</span>}
           </p>
           <ul className="space-y-0.5" data-testid="arbol-p0">
@@ -125,14 +125,17 @@ function HojaFila({ f, hasta }: { f: FilaArbol; hasta: string }) {
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(48px,35%)_40px] items-center gap-x-2 gap-y-1.5">
           {r.porGate.map((x) => <Barra key={x.gate} rotulo={x.gate} n={milesPunto(x.n)} pct={(x.n / mxG) * 100} color={tono(f)} />)}
         </div>
+        {r.porGate.some((x) => x.gate.includes(' o ')) && (
+          <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">«gate 2 o 3»: las dos tenían su calibre y calidad; la pieza podía ir a cualquiera.</p>
+        )}
       </Seccion>
-      <Seccion titulo="Por hora">
+      <Seccion titulo="Piezas por hora del reloj">
         <div className="flex h-[88px] items-end gap-1">
           {r.porHora.map((x) => (
             <div key={x.hora} className="flex flex-1 flex-col items-center gap-0.5">
-              <span className="text-[12px] tabular-nums text-foreground">{x.n}</span>
+              <span className="text-[12px] tabular-nums text-foreground">{x.n} pz</span>
               <span className="w-full rounded-t-[3px]" style={{ height: `${(x.n / mxH) * 48}px`, background: tono(f) }} />
-              <span className="text-[12px] tabular-nums text-muted-foreground">{x.hora}</span>
+              <span className="text-[12px] tabular-nums text-muted-foreground">{/^\d{1,2}$/.test(String(x.hora)) ? `${String(x.hora).padStart(2, '0')}:00` : x.hora}</span>
             </div>
           ))}
         </div>

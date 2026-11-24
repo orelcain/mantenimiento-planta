@@ -112,7 +112,10 @@ function textoSolapes(s: SeteoVivo): string | null {
 
 /** Arriba: las 12 gates a la vista, con la última hora como cifra principal. */
 export function SeteoGates({ s }: { s: SeteoVivo }) {
-  const sub = `Lo que dice la máquina, leído de las piezas · última hora ${s.hora.desde}–${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
+  // Con menos de una hora de grader, «última hora 20:58–21:58» parecía otro turno (video 23-11): se dice cuánto lleva.
+  const sub = s.minutosActivosHora < 55
+    ? `Lo que dice la máquina, leído de las piezas · grader hasta las ${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
+    : `Lo que dice la máquina, leído de las piezas · última hora del grader ${s.hora.desde}–${s.hora.hasta}, ${s.minutosActivosHora} min con producción`
   const solape = textoSolapes(s)
   const cambios = s.cambios
   const g0 = s.gate0
@@ -142,7 +145,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right">
                   <span className="text-[15px] font-semibold text-foreground">{coma1(g.pzMinHora)}</span>{' '}
-                  <span className="text-[12px] text-muted-foreground">turno {coma1(g.pzMinTurno)}</span>
+                  <span className="text-[12px] text-muted-foreground">turno {coma1(g.pzMinTurno)} pz/min</span>
                 </td>
                 <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g.pctHora)} %</td>
                 <td className="py-2">
@@ -158,7 +161,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
               </td>
               <td className="whitespace-nowrap py-2 pr-3 text-right">
                 <span className="text-[15px] font-semibold text-foreground">{coma1(g0.pzMinHora)}</span>{' '}
-                <span className="text-[12px] text-muted-foreground">turno {coma1(g0.pzMinTurno)}</span>
+                <span className="text-[12px] text-muted-foreground">turno {coma1(g0.pzMinTurno)} pz/min</span>
               </td>
               <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g0.pctHora)} %</td>
               <td className="py-2">
@@ -180,7 +183,7 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
               <MarcaGate g={g} />
             </div>
             <p className="mt-1 text-[13px] leading-[18px] tabular-nums text-foreground">
-              <b className="font-semibold">{coma1(g.pzMinHora)} pz/min</b> · {coma1(g.pctHora)} % <span className="text-muted-foreground">· turno {coma1(g.pzMinTurno)}</span>
+              <b className="font-semibold">{coma1(g.pzMinHora)} pz/min</b> · {milesPunto(g.piezasHora)} pz · {coma1(g.pctHora)} % de la salida <span className="text-muted-foreground">· turno {coma1(g.pzMinTurno)} pz/min</span>
             </p>
             <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} programa={rangoProgramaKg(g.programa)} className="mt-2" />
             <p className="mt-1 text-[12px] leading-[16px] tabular-nums text-muted-foreground">Peso {rangoTxt(g.pesoKg)} kg</p>

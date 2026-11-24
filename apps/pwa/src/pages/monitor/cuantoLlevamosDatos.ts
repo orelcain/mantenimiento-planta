@@ -77,16 +77,27 @@ export interface ExtraTurno {
   alCierre: number | null
   /** Minutos que faltan para el fin del turno (0 si cerró). */
   faltanMin: number
+  /** Minutos del turno hasta la última pieza leída. */
+  minTurno: number
+  /** De esos, minutos con al menos una pieza en el grader. */
+  minActivos: number
+  /** Minutos que mide «la última hora» (menos de 60 al empezar el turno). */
+  minHora: number
 }
+
+/** Antes de estos minutos de turno, el ritmo no se proyecta al cierre ni se estima la línea manual (video 23-11). */
+export const MIN_PARA_ESTIMAR = 30
 
 /** Ritmo y proyección al cierre con números planos (sirve igual para Eviscerado). `pz` por minuto del turno. */
 export function extraDelTurno(pz: readonly number[], hastaMin: number, totalMin: number, enCurso: boolean, g0Pz: number): ExtraTurno {
   const ini = Math.max(0, hastaMin - 60)
   let ult = 0
   let todo = 0
+  let activos = 0
   for (let m = 0; m < hastaMin; m++) {
     const v = pz[m] ?? 0
     todo += v
+    if (v > 0) activos++
     if (m >= ini) ult += v
   }
   const minUlt = hastaMin - ini
@@ -98,7 +109,10 @@ export function extraDelTurno(pz: readonly number[], hastaMin: number, totalMin:
     ritmoTurno,
     p0Pct: todo > 0 && g0Pz > 0 ? (g0Pz / todo) * 100 : null,
     p0Pz: g0Pz,
-    alCierre: enCurso && faltanMin > 0 && minUlt >= 15 ? todo + (ritmoHora * faltanMin) / 60 : null,
+    alCierre: enCurso && faltanMin > 0 && minUlt >= MIN_PARA_ESTIMAR ? todo + (ritmoHora * faltanMin) / 60 : null,
     faltanMin,
+    minTurno: hastaMin,
+    minActivos: activos,
+    minHora: minUlt,
   }
 }

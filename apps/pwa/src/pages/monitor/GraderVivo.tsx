@@ -8,7 +8,7 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BellRing, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
+import { BellRing, ChevronRight, Layers, Scale, SplitSquareHorizontal } from 'lucide-react'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { Tarjeta } from './TarjetaVivo'
 import { CuantoLlevamos } from './CuantoLlevamos'
@@ -44,27 +44,42 @@ function useAncho<T extends HTMLElement>(): [React.RefObject<T>, number] {
 
 const IC = "h-3.5 w-3.5"
 
+/** «34 min», «2 h 05 min». */
+const duracion = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`)
 
-function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
+
+/** Con `onAbrirTramo`, la alerta de P0 se toca y abre el detalle de su tramo (qué piezas y por qué). */
+function Alertas({ d, ultimaHora, onAbrirTramo }: { d: Datos; ultimaHora: string | null; onAbrirTramo?: (desdeMin: number) => void }) {
   const a = d.alertas
   // Último tramo de 15 min cerrado con piezas suficientes: el mismo que mira la alerta «P0 alto».
   const ultimoP0 = d.totales.p0 === null ? null : [...d.p0].reverse().find((t) => t.completo && !t.pocaMasa && t.pct !== null) ?? null
   return (
     <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'} icono={<BellRing className={IC} />}>
       <ul className="mt-3 space-y-2" aria-label="Alertas del grader">
-        {a.map((x: AlertaGrader, i) => (
-          <li
-            key={`${x.regla}-${i}`}
-            data-regla={x.regla}
-            className="v2-subtarjeta flex gap-2.5 rounded-card px-3 py-2.5"
-          >
-            <span aria-hidden className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: x.nivel === 'mal' ? 'var(--v2-mal)' : 'var(--v2-atento)' }} />
-            <div className="min-w-0">
-              <p className="text-[15px] font-semibold leading-tight tabular-nums" style={{ color: x.nivel === 'mal' ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)' }}>{x.titulo}</p>
-              <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{x.detalle}</p>
-            </div>
-          </li>
-        ))}
+        {a.map((x: AlertaGrader, i) => {
+          const abrir = x.regla === 'p0-alto' && onAbrirTramo ? () => onAbrirTramo(x.desdeMin) : undefined
+          const cuerpo = (
+            <>
+              <span aria-hidden className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: x.nivel === 'mal' ? 'var(--v2-mal)' : 'var(--v2-atento)' }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold leading-tight tabular-nums" style={{ color: x.nivel === 'mal' ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)' }}>{x.titulo}</p>
+                <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{x.detalle}</p>
+              </div>
+              {abrir && <ChevronRight aria-hidden className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            </>
+          )
+          return (
+            <li key={`${x.regla}-${i}`} data-regla={x.regla} data-nivel={x.nivel}>
+              {abrir ? (
+                <button type="button" onClick={abrir} className="v2-subtarjeta flex min-h-[44px] w-full gap-2.5 rounded-card px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--v2-acento)_10%,transparent)]">
+                  {cuerpo}
+                </button>
+              ) : (
+                <div className="v2-subtarjeta flex gap-2.5 rounded-card px-3 py-2.5">{cuerpo}</div>
+              )}
+            </li>
+          )
+        })}
       </ul>
       {a.length === 0 && (
         <div className="mt-3 space-y-1.5 text-[13px] leading-[18px]" data-testid="alertas-vigila">
@@ -244,6 +259,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
     return d.alertas.length > 0 ? <div className="v2-vars" data-testid="grader-vivo"><Alertas d={d} ultimaHora={null} /></div> : null
   }
   const ultimaHora = d.serie.ultimaTs ? d.serie.ultimaTs.slice(11, 16) : null
+  const extra = extraDelTurno(d.serie.pz, d.serie.hastaMin, d.n, turnoEnCurso, d.totales.g0)
   const abrirAccion = (a: Accion) => {
     if (a.destino.tipo === 'tramo') setHoja({ tipo: 'tramo', desdeMin: Math.max(0, Math.floor((a.destino.desdeMs - d.serie.t0Ms) / 60_000)) })
     else if (a.destino.tipo === 'combo') setHoja({ tipo: 'combo', calibres: a.destino.calibres, calidad: a.destino.calidad })
@@ -252,8 +268,8 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
       <div className="grid items-start gap-3 lg:grid-cols-3">
-        <Alertas d={d} ultimaHora={ultimaHora} />
-        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)}`} extra={extraDelTurno(d.serie.pz, d.serie.hastaMin, d.n, turnoEnCurso, d.totales.g0)} />
+        <Alertas d={d} ultimaHora={ultimaHora} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} />
+        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)} · grader ${duracion(extra.minTurno)}, ${duracion(extra.minActivos)} con producción`} extra={extra} />
         {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} onAbrir={abrirAccion} />}
       </div>
       <GraficoVivo d={d} onAbrirLote={setLoteAbierto} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />

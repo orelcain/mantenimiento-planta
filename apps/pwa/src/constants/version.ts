@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.21.0' as const
+export const APP_VERSION = '4.22.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-23' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Lector del grader e1.10: Puerta 0 del espejo y botón «Actualizar causas P0»' as const
+export const VERSION_NAME = 'Pestaña Grader del monitor: mejoras del video de Orel (alertas por nivel, minuto exacto, sin swipe)' as const
 
 /**
  * Nota:
