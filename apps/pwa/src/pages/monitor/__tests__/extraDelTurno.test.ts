@@ -18,6 +18,20 @@ describe('extraDelTurno (ritmo, P0 y cierre)', () => {
   it('no proyecta con menos de 15 minutos de datos', () => {
     expect(extraDelTurno([30, 30, 30], 3, 480, true, 0).alCierre).toBeNull()
   })
+  it('velocidad de máquina: solo minutos con producción; distinta de la de reloj si hubo pausas', () => {
+    // 60 min: 30 produciendo a 40 pz/min y 30 parados.
+    const con = Array.from({ length: 60 }, (_, m) => (m < 30 ? 40 : 0))
+    const e = extraDelTurno(con, 60, 480, true, 0)
+    expect(e.minActivos).toBe(30)
+    expect(e.ritmoTurno).toBe(1200)
+    expect(e.ritmoMaquina).toBe(2400)
+    expect(e.ritmoMaquina).toBeGreaterThan(e.ritmoTurno)
+  })
+  it('sin pausas la de máquina iguala a la de reloj; sin minutos activos es 0', () => {
+    const e = extraDelTurno(pz, 120, 480, true, 0)
+    expect(e.ritmoMaquina).toBe(e.ritmoTurno)
+    expect(extraDelTurno([0, 0, 0], 3, 480, true, 0).ritmoMaquina).toBe(0)
+  })
   it('sin Gate 0 el P0 es null, no 0', () => {
     expect(extraDelTurno(pz, 120, 480, true, 0).p0Pct).toBeNull()
   })

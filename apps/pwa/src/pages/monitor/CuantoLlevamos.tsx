@@ -33,6 +33,14 @@ function HoraAHora({ horas, t0Ms, e }: { horas: HoraGrader[]; t0Ms: number; e: E
       <p className="text-[12px] leading-4 text-muted-foreground tabular-nums">{nota}</p>
     </div>
   )
+  const vel = (rotulo: string, pzH: number, nota: string) => (
+    <div className="min-w-0" data-testid="cuanto-velocidad">
+      <p className="text-[12px] leading-4 text-muted-foreground">{rotulo}</p>
+      <p className="text-[17px] font-semibold leading-6 tabular-nums">{milesPunto(Math.round(pzH))} <small className="text-[12px] font-medium text-muted-foreground">pz/h</small></p>
+      <p className="text-[13px] leading-[18px] tabular-nums">{coma1(pzH / 60)} <small className="text-[12px] text-muted-foreground">pz/min</small></p>
+      <p className="text-[12px] leading-4 text-muted-foreground">{nota}</p>
+    </div>
+  )
   return (
     <div className="mt-4 border-t border-border/40 pt-3" data-testid="cuanto-hora-a-hora">
       <p className="text-[13px] font-medium leading-[18px]">Hora a hora</p>
@@ -54,7 +62,9 @@ function HoraAHora({ horas, t0Ms, e }: { horas: HoraGrader[]; t0Ms: number; e: E
       </div>
       <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">La raya es el promedio del turno; la última hora, más oscura, aún no se completa.</p>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-        <div className="col-span-2">{kpi('Velocidad promedio del turno', `${milesPunto(Math.round(e.ritmoTurno))} pz/h · ${coma1(e.ritmoTurno / 60)} pz/min`, 'por hora de reloj, contando las pausas')}</div>
+        <p className="col-span-2 text-[13px] font-medium leading-[18px]">Velocidad promedio del turno</p>
+        {vel('Por hora de reloj', e.ritmoTurno, 'con pausas')}
+        {vel('Por hora de máquina', e.ritmoMaquina, 'solo produciendo')}
         {ext && kpi('Mejor hora', `${milesPunto(ext.mejor.pz)} pz`, `desde las ${hh(ext.mejor)}`)}
         {ext && kpi('Peor hora', `${milesPunto(ext.peor.pz)} pz`, `desde las ${hh(ext.peor)}`)}
       </div>

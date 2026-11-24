@@ -68,8 +68,10 @@ export function tramosBarra(c: CuentaTurno): { baader: number; manual: number; s
 export interface ExtraTurno {
   /** Piezas por hora de la última hora leída (proyectado a 60 min si lleva menos). */
   ritmoHora: number
-  /** Piezas por hora promedio del turno hasta ahora. */
+  /** Piezas por hora promedio del turno hasta ahora, por hora de reloj (cuenta las pausas). */
   ritmoTurno: number
+  /** Piezas por hora de máquina: las del turno entre los minutos con producción (sin pausas). Misma base que `minActivos`. */
+  ritmoMaquina: number
   /** % de P0 del turno (`null` sin piezas o sin Gate 0). */
   p0Pct: number | null
   p0Pz: number
@@ -103,10 +105,12 @@ export function extraDelTurno(pz: readonly number[], hastaMin: number, totalMin:
   const minUlt = hastaMin - ini
   const ritmoHora = minUlt > 0 ? (ult * 60) / minUlt : 0
   const ritmoTurno = hastaMin > 0 ? (todo * 60) / hastaMin : 0
+  const ritmoMaquina = activos > 0 ? (todo * 60) / activos : 0
   const faltanMin = enCurso ? Math.max(0, totalMin - hastaMin) : 0
   return {
     ritmoHora,
     ritmoTurno,
+    ritmoMaquina,
     p0Pct: todo > 0 && g0Pz > 0 ? (g0Pz / todo) * 100 : null,
     p0Pz: g0Pz,
     alCierre: enCurso && faltanMin > 0 && minUlt >= MIN_PARA_ESTIMAR ? todo + (ritmoHora * faltanMin) / 60 : null,
