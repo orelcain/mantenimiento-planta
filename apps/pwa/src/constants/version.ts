@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-24' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Pestaña Grader del monitor: hoja por gate, historial de cambios, campana de peso y matriz calibre × calidad' as const
+export const VERSION_NAME = 'Grader del monitor: «¿Cuánto llevamos?» con hora a hora, velocidad promedio y mejor/peor hora' as const
 
 /**
  * Nota:

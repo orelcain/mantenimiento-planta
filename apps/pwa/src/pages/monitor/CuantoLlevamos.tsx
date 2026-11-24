@@ -4,10 +4,10 @@
  * igual en el monitor de Eviscerado.
  */
 import { BarChart3 } from 'lucide-react'
-import { coma1, milesPunto } from '@/services/grader/espejo/alertasGrader'
+import { coma1, horaDelEje, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { Tarjeta } from './TarjetaVivo'
-import { MIN_PARA_ESTIMAR, manualPz, textoManual, tramosBarra, type CuentaTurno, type ExtraTurno } from './cuantoLlevamosDatos'
+import { MIN_PARA_ESTIMAR, extremosHoras, manualPz, textoManual, tramosBarra, type CuentaTurno, type ExtraTurno, type HoraGrader } from './cuantoLlevamosDatos'
 
 const BAADER = 'color-mix(in srgb, var(--v2-acento) 45%, transparent)'
 const MANUAL = 'var(--v2-acento)'
@@ -16,6 +16,50 @@ function Muestra({ color, banda }: { color?: string; banda?: boolean }) {
   return banda
     ? <i aria-hidden className="mr-1.5 inline-block h-2.5 w-3.5 rounded-[3px] border border-dashed align-middle" style={{ background: 'var(--v2-reja)', borderColor: 'var(--v2-gris)' }} />
     : <i aria-hidden className="mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] align-middle" style={{ background: color }} />
+}
+
+/**
+ * Hora a hora de piezas por el grader (como «Cómo vamos hora a hora» de la Baader): una barra por hora corrida del turno y
+ * una raya en el promedio del turno. La hora incompleta se marca y no compite por mejor/peor.
+ */
+function HoraAHora({ horas, t0Ms, e }: { horas: HoraGrader[]; t0Ms: number; e: ExtraTurno }) {
+  const tope = Math.max(1, e.ritmoTurno, ...horas.map((h) => h.pz))
+  const ext = extremosHoras(horas)
+  const hh = (h: HoraGrader) => horaDelEje(t0Ms, h.desdeMin)
+  const kpi = (rotulo: string, valor: string, nota: string) => (
+    <div className="min-w-0">
+      <p className="text-[12px] leading-4 text-muted-foreground">{rotulo}</p>
+      <p className="text-[17px] font-semibold leading-6 tabular-nums">{valor}</p>
+      <p className="text-[12px] leading-4 text-muted-foreground tabular-nums">{nota}</p>
+    </div>
+  )
+  return (
+    <div className="mt-4 border-t border-border/40 pt-3" data-testid="cuanto-hora-a-hora">
+      <p className="text-[13px] font-medium leading-[18px]">Hora a hora</p>
+      <div className="relative mt-2">
+        <ul className="space-y-1.5">
+          {horas.map((h) => (
+            <li key={h.n} className="grid grid-cols-[40px_1fr_auto] items-center gap-x-2.5 text-[13px] tabular-nums" aria-label={`Hora ${h.n}, desde las ${hh(h)}: ${milesPunto(h.pz)} piezas${h.parcial ? `, ${h.minutos} min leídos` : ''}`}>
+              <span className="text-muted-foreground">{hh(h)}</span>
+              <span className="relative block h-3.5 overflow-hidden rounded-full" style={{ background: 'rgb(var(--muted))' }}>
+                <span className={`block h-full rounded-full${h.parcial ? ' border border-dashed' : ''}`} style={{ width: `${Math.max(1, (h.pz / tope) * 100)}%`, background: h.parcial ? 'var(--v2-acento)' : BAADER, borderColor: 'var(--v2-gris)' }} />
+              </span>
+              <span className="w-[78px] text-right"><b className="font-semibold">{milesPunto(h.pz)}</b>{h.parcial && <small className="ml-1 text-[11px] text-muted-foreground">{h.minutos} min</small>}</span>
+            </li>
+          ))}
+        </ul>
+        {e.ritmoTurno > 0 && (
+          <span aria-hidden className="pointer-events-none absolute bottom-0 top-0 w-px" style={{ left: `calc(40px + 0.625rem + (100% - 40px - 78px - 1.25rem) * ${Math.min(1, e.ritmoTurno / tope)})`, background: 'var(--v2-gris)' }} />
+        )}
+      </div>
+      <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">La raya es el promedio del turno; la última hora, más oscura, aún no se completa.</p>
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="col-span-2">{kpi('Velocidad promedio del turno', `${milesPunto(Math.round(e.ritmoTurno))} pz/h · ${coma1(e.ritmoTurno / 60)} pz/min`, 'por hora de reloj, contando las pausas')}</div>
+        {ext && kpi('Mejor hora', `${milesPunto(ext.mejor.pz)} pz`, `desde las ${hh(ext.mejor)}`)}
+        {ext && kpi('Peor hora', `${milesPunto(ext.peor.pz)} pz`, `desde las ${hh(ext.peor)}`)}
+      </div>
+    </div>
+  )
 }
 
 /** Ritmo, P0 y cierre: lo que ayuda a decidir si el turno va bien. Cada fila dice qué compara. */
@@ -38,7 +82,7 @@ function Extra({ e }: { e: ExtraTurno }) {
   )
 }
 
-export function CuantoLlevamos({ c, sub, extra }: { c: CuentaTurno; sub: string; extra?: ExtraTurno }) {
+export function CuantoLlevamos({ c, sub, extra, horas, t0Ms }: { c: CuentaTurno; sub: string; extra?: ExtraTurno; horas?: HoraGrader[]; t0Ms?: number }) {
   // Al empezar el turno la resta grader − Baader salta (51, ≈ 0, −31…): no se estima antes de MIN_PARA_ESTIMAR.
   const temprano = extra !== undefined && extra.minTurno < MIN_PARA_ESTIMAR
   const m = temprano ? null : manualPz(c)
@@ -77,6 +121,7 @@ export function CuantoLlevamos({ c, sub, extra }: { c: CuentaTurno; sub: string;
         <p className="mt-2 text-[12px] leading-4 text-muted-foreground">Sin serie de las Baader: no se puede separar la línea manual.</p>
       )}
       {extra && <Extra e={extra} />}
+      {extra && horas && horas.length > 0 && t0Ms !== undefined && <HoraAHora horas={horas} t0Ms={t0Ms} e={extra} />}
     </Tarjeta>
   )
 }
