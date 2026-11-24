@@ -131,7 +131,7 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
             <p className="text-title2 font-semibold text-muted-foreground" aria-busy="true">Cargando piezas…</p>
           ) : total > 0 ? (
             <>
-              <p className="text-title1 font-semibold tabular-nums">{miles(total)} piezas</p>
+              <p className="text-title1 font-semibold tabular-nums">{miles(total)} piezas <span className="text-[15px] font-medium text-muted-foreground">en el grader</span></p>
               {linea && <p className="text-footnote text-muted-foreground tabular-nums">{linea}</p>}
             </>
           ) : (

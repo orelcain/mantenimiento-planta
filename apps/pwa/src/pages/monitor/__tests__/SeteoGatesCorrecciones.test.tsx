@@ -8,7 +8,7 @@ import { tramosDeGate, seteoGatesVivo } from '@/services/grader/espejo/seteoGate
 import type { PiezaEspejo } from '@/services/grader/espejo/espejoFilas'
 import type { CalibreRange } from '@/services/grader/types'
 import { turnoReal } from '@/services/grader/espejo/__fixtures__/turnosReales'
-import { PescaPorPrograma } from '../SeteoGatesVivo'
+import { SalidaPorCalibre } from '../SalidaPorCalibre'
 
 afterEach(cleanup)
 
@@ -41,14 +41,14 @@ describe('G10 del 21-11 T2: un paso suelto no deja dos rótulos', () => {
   })
 })
 
-describe('Pesca por programa: la sugerencia en prueba es solo para admin', () => {
+describe('Salida por calibre: la sugerencia en prueba es solo para admin', () => {
   const s = seteoGatesVivo(turnoReal('2026-11-19-turno_2').piezas)!
   it('admin la ve; el público no', () => {
     expect(s.sugerencia).not.toBeNull()
-    render(<PescaPorPrograma s={s} />)
+    render(<SalidaPorCalibre s={s} />)
     expect(screen.getByTestId('sugerencia-gates')).toBeTruthy()
     cleanup()
-    const { container } = render(<PescaPorPrograma s={s} publico />)
+    const { container } = render(<SalidaPorCalibre s={s} publico />)
     expect(screen.queryByTestId('sugerencia-gates')).toBeNull()
     expect(container.textContent).not.toMatch(/Sugerencia|en prueba/)
   })

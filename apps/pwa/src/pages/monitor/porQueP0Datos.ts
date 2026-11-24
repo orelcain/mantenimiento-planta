@@ -197,7 +197,7 @@ export interface DetalleMinuto {
 }
 
 /** Motivo de una pieza de P0 para el detalle: exacto si cruzó con Puerta 0; si no, la causa estimada. */
-function motivoDe(p: PiezaP0): string {
+export function motivoDe(p: PiezaP0): string {
   if (p.exacto && p.motivo) {
     const k = filaDeMotivo(p.motivo)
     return k === 'fdl' ? 'Fuera de límites' : k === 'foto' ? 'No leído por fotocélula' : k === 'puerta' ? 'Puerta no preparada' : k === 'tooclose' ? 'Too close or too long' : p.motivo

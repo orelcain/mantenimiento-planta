@@ -290,6 +290,12 @@ export function largoVentana(len: number): string {
 /** Franjas sobre el panel de arriba (px desde el borde del gráfico): lotes y, debajo, la entrada manual estimada. */
 export const FRANJA = { loteY: 2, loteAlto: 16, manualY: 22, manualAlto: 6 } as const
 
+/** `rgb(r, g, b)` → `rgba(r, g, b, a)` (el canvas no entiende `color-mix`); otro formato pasa igual. */
+export function conAlfa(color: string, a: number): string {
+  const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(color)
+  return m ? `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${a})` : color
+}
+
 /** Alto (px) de cada panel y márgenes: los usa la opción y el componente (para medir el ancho útil). */
 export const GEOM = { izq: 34, der: 10, arriba: 34, alto1Angosto: 130, alto1: 160, hueco: 34, alto2: 70, slider: 26 } as const
 
@@ -328,8 +334,10 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
   const eje = (gi: number, conRotulo: boolean) => ({
     type: 'value' as const,
     gridIndex: gi,
-    min: v.a,
-    max: v.b,
+    // El eje abarca TODO el turno; la ventana la fija el dataZoom. Así el minimapa (slider) muestra el turno entero
+    // y resalta la ventana actual (antes el eje era la ventana y el minimapa solo mostraba lo ya visible).
+    min: 0,
+    max: Math.max(1, g.hasta),
     axisLine: { show: false },
     splitLine: { show: false },
     axisTick: { show: conRotulo, customValues: marcas, length: 6, lineStyle: { color: tema.textoSuave } },
@@ -337,7 +345,16 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
     axisLabel: conRotulo
       ? { customValues: marcas, formatter: (x: number) => hm(x), color: tema.textoSuave, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', hideOverlap: true }
       : { show: false },
-    axisPointer: { show: true, snap: false, label: { show: false }, lineStyle: { color: tema.texto, opacity: 0.35 } },
+    // `snap`: la raya cae al centro del minuto (las curvas van en m + 0,5) y el tooltip, la barra tocada y el rótulo
+    // del eje dicen el mismo minuto (Orel, video 23-11: la raya iba al borde y el tooltip decía 21:52 sobre 21:51).
+    axisPointer: {
+      show: true,
+      snap: true,
+      label: conRotulo
+        ? { show: true, formatter: (p: { value: number }) => hm(Math.floor(p.value)), backgroundColor: tema.texto, color: tema.fondo, fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', padding: [2, 6], borderRadius: 6 }
+        : { show: false },
+      lineStyle: { color: tema.texto, opacity: 0.35 },
+    },
   })
   const yEje = (gi: number, max: number, pct: boolean) => ({
     type: 'value' as const,
@@ -381,8 +398,9 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
     ],
     yAxis: [yEje(0, tope1, false), yEje(1, topeP0, modo === '15')],
     dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', startValue: v.a, endValue: v.b, minValueSpan: ZOOM_MIN_MIN, disabled: true }, // los gestos (rueda, pellizco, arrastre) los maneja GraficoVivo: el inside de ECharts no respondía
+      { id: 'dz-inside', type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', startValue: v.a, endValue: v.b, minValueSpan: ZOOM_MIN_MIN, disabled: true }, // los gestos (rueda, pellizco, arrastre) los maneja GraficoVivo: el inside de ECharts no respondía
       {
+        id: 'dz-slider',
         type: 'slider',
         xAxisIndex: [0, 1, 2],
         filterMode: 'none',
@@ -397,7 +415,7 @@ export function opcionGrafico(g: DatosGrafico, v: Ventana, filtro: FiltroDueno, 
         brushSelect: false,
         borderColor: tema.reja,
         backgroundColor: tema.reja,
-        fillerColor: 'rgba(0,0,0,0)',
+        fillerColor: conAlfa(tema.acento, 0.18),
         handleStyle: { color: tema.acento, borderColor: tema.acento },
         moveHandleStyle: { color: tema.acento, opacity: 0.5 },
         dataBackground: { lineStyle: { color: tema.acento, opacity: 0.6, width: 1 }, areaStyle: { opacity: 0 } },

@@ -49,11 +49,13 @@ describe('¿Hay que hacer algo?, 18-11 T1', () => {
     expect(a.map((x) => [x.titulo, x.detalle])).toEqual([
       // Calibre por peso (como el mockup, 50 % → 60 %); por etiqueta de Matrix daría 59 % → 74 %.
       ['Revisar gates de 8-10 lb', 'El lote …738 trae más 8-10 lb: 61 % del peso (el anterior, 50 %)'],
-      ['Agregar gate 10-12 lb Industrial', '26 pz · 134 kg fueron a P0 porque ninguna gate recibe 10-12 lb Industrial'],
       // El mockup decía «gates 11 y 12» fijo; G11 pasó a 8-10 a las 03:21, así que a las 04:30 solo G12 tiene 10-12.
       ['Repartir 10-12 lb en más gates', '9 pz de puerta no preparada en 15 min (gate 12)'],
+      // 26 pz: bajo ACCION_AGREGAR_PZ (30) es sugerencia y va al final (video de Orel, 23-11).
+      ['Agregar gate 10-12 lb Industrial', '26 pz · 134 kg fueron a P0 porque ninguna gate recibe 10-12 lb Industrial'],
     ])
     expect(a.map((x) => x.dueno)).toEqual(['seteo', 'seteo', 'seteo'])
+    expect(a.map((x) => x.nivel ?? 'accion')).toEqual(['accion', 'accion', 'sugerencia'])
   })
 
   it('sin Puerta 0 no se pide repartir (la puerta exige el motivo exacto)', () => {

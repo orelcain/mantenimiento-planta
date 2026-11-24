@@ -37,7 +37,7 @@ export function LotesDelTurno({ filas, t0Ms, hastaMin, onAbrir }: { filas: reado
   const span = Math.max(1, hastaMin - ini)
   const pos = (a: number, b: number) => ({ left: `${((a - ini) / span) * 100}%`, width: `${Math.max(0.5, ((b - a) / span) * 100)}%` })
   return (
-    <Tarjeta titulo="Lotes del turno" icono={<Package className={IC} />}>
+    <Tarjeta titulo="Lotes del turno" sub="Piezas y kg leídos en el grader" icono={<Package className={IC} />}>
       <div className="relative mt-3.5 h-3.5 overflow-hidden rounded-full bg-muted" aria-hidden>
         {filas.map((f) => (
           <span key={`${f.tipo}-${f.desdeMin}`} className="absolute inset-y-0" style={{ ...pos(f.desdeMin, f.hastaMin), background: f.tipo === 'lote' ? colorLote(f.k) : 'var(--v2-reja)' }} />

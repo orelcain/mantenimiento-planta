@@ -106,7 +106,7 @@ export interface EntradaAlertas {
   umbrales?: Partial<UmbralesAlertas>
 }
 
-export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio' | 'rafaga-fotocelula'
+export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio' | 'rafaga-fotocelula' | 'fuera-de-rango'
 
 export interface AlertaGrader {
   regla: ReglaAlerta
@@ -288,9 +288,15 @@ export function reglaP0Alto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader
   const dueno = d ? ` Dueño: ${d.dueno === 'mantencion' ? 'Mantención' : 'seteo y pesca'}, ${milesPunto(d.dueno === 'mantencion' ? d.mant : d.total - d.mant)} de ${milesPunto(d.total)} piezas${d.estimado ? ' (estimado)' : ''}.` : ''
   // 7 / 200 · 100 da 3,5000000000000004 en coma flotante: «justo 3,5 %» no es «sobre 3,5 %».
   if (!(pct - u.p0CriticoPct > 1e-9)) return null
+  // Rojo solo si es sostenido (el tramo anterior también pasó el umbral) o si dobla el umbral; un tramo suelto, p. ej.
+  // al empezar el turno, es «atento» (Orel, video 23-11: 39 de 627 piezas a las 21:45 no es una alarma).
+  const previo = ts[ts.length - 2]
+  const totalPrevio = previo ? suma(e.grader.pz, previo.desde, previo.hasta) : 0
+  const previoAlto = !!previo && totalPrevio >= u.p0MinPiezas
+    && (suma(e.grader.g0, previo.desde, previo.hasta) / totalPrevio) * 100 - u.p0CriticoPct > 1e-9
   return {
     regla: 'p0-alto',
-    nivel: 'mal',
+    nivel: previoAlto || pct >= 2 * u.p0CriticoPct ? 'mal' : 'atento',
     desdeMin: t.desde,
     titulo: `P0 ${coma1(pct)} % de ${horaDelEje(e.t0Ms, t.desde)} a ${horaDelEje(e.t0Ms, t.hasta)}`,
     detalle: `Sobre ${coma1(u.p0CriticoPct)} % los 15 min completos: ${milesPunto(g0)} de ${milesPunto(total)} piezas a Gate 0.${dueno}`,
