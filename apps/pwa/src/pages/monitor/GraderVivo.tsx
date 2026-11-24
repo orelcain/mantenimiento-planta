@@ -19,7 +19,7 @@ import { HojaLote, LotesDelTurno } from './LotesDelTurno'
 import { LineaManual } from './LineaManual'
 import { indiceLote } from './lotesTurnoDatos'
 import type { Accion } from './hayQueHacerDatos'
-import { cuentaDelTurno, extraDelTurno } from './cuantoLlevamosDatos'
+import { cuentaDelTurno, extraDelTurno, horasDelTurno } from './cuantoLlevamosDatos'
 import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates } from './SeteoGatesVivo'
@@ -148,7 +148,7 @@ export function GraderVivo(props: EntradaGraderVivo & { publico?: boolean }) {
     <div className="v2-vars space-y-3" data-testid="grader-vivo">
       <div className="grid items-start gap-3 lg:grid-cols-3">
         <Alertas d={d} ultimaHora={ultimaHora} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} />
-        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)} · grader ${duracion(extra.minTurno)}, ${duracion(extra.minActivos)} con producción`} extra={extra} />
+        <CuantoLlevamos c={cuentaDelTurno(d.serie, d.baader, d.retraso.min, d.sinLectura)} sub={`desde las ${horaDelEje(d.serie.t0Ms, 0)} · grader ${duracion(extra.minTurno)}, ${duracion(extra.minActivos)} con producción`} extra={extra} horas={horasDelTurno(d.serie.pz, d.serie.hastaMin)} t0Ms={d.serie.t0Ms} />
         {d.pesca && <HayQueHacerAlgo h={d.pesca.hacer} onAbrir={abrirAccion} />}
       </div>
       <GraficoVivo d={d} onAbrirLote={setLoteAbierto} onAbrirTramo={d.pesca ? (m) => setHoja({ tipo: 'tramo', desdeMin: m }) : undefined} onAbrirMinuto={d.pesca ? (m) => setHoja({ tipo: 'minuto', min: m }) : undefined} />
