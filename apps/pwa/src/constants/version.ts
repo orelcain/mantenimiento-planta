@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.23.3' as const
+export const APP_VERSION = '4.23.4' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-24' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Gráfico del turno en el monitor: el minimapa muestra todo el turno y la ventana de zoom, sincronizado con botones y gestos' as const
+export const VERSION_NAME = 'Pestaña Grader del monitor: hoja por gate, historial de cambios, campana de peso y matriz calibre × calidad' as const
 
 /**
  * Nota:
