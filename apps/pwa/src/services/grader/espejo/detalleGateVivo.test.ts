@@ -1,6 +1,13 @@
 /** Detalle de una gate (tanda 2): rango en lb y kg, hacia dónde se cargan las piezas y la tira por minuto. 18-11 T1 a las 04:30. */
 import { describe, expect, it } from 'vitest'
-import { detalleGate, detalleGate0, ejeDeGate, rangoLbKg, repartoEnRango, type PiezaGate0 } from './detalleGateVivo'
+import { detalleGate, detalleGate0, ejeDeGate, kgALbTxt, rangoLbKg, repartoEnRango, type PiezaGate0 } from './detalleGateVivo'
+
+describe('kgALbTxt', () => {
+  it('dice un peso en libras con un decimal y coma', () => {
+    expect(kgALbTxt(4.54)).toBe('10,0 lb')
+    expect(kgALbTxt(3.63)).toBe('8,0 lb')
+  })
+})
 import { seteoGatesVivo } from './seteoGatesVivo'
 import { piezasHasta, turnoReal } from './__fixtures__/turnosReales'
 import type { PiezaEspejo } from './espejoFilas'

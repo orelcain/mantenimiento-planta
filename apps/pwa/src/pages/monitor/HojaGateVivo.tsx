@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { milesPunto } from '@/services/grader/espejo/alertasGrader'
-import type { DetalleGate, MinutoGate, RangoLbKg } from '@/services/grader/espejo/detalleGateVivo'
+import { kgALbTxt, type DetalleGate, type MinutoGate, type RangoLbKg } from '@/services/grader/espejo/detalleGateVivo'
 import { acentoAl, FONDO_SUB, hhmm, kg2, programaTxt } from './formatoGateVivo'
 import type { ArmadoGate } from './hojaGateDatos'
 
@@ -145,17 +145,17 @@ function TiraMinuto({ m, eje, rango, g0, programa }: { m: MinutoGate; eje: [numb
         {g0 ? (
           <ul className="space-y-0.5">
             {m.puntos.map((p, i) => (
-              <li key={i} className="text-footnote tabular-nums"><b>{kg2(p.kg)} kg</b> <span className="text-muted-foreground">· {p.motivo ?? 'Sin motivo'}{p.calidad ? ` · ${p.calidad}` : ''}</span></li>
+              <li key={i} className="text-footnote tabular-nums"><b>{kg2(p.kg)} kg</b> <span className="text-muted-foreground">· {kgALbTxt(p.kg)} · {p.motivo ?? 'Sin motivo'}{p.calidad ? ` · ${p.calidad}` : ''}</span></li>
             ))}
           </ul>
         ) : (
           <>
             <p className="flex flex-wrap gap-x-2.5 gap-y-1">
               {m.puntos.map((p, i) => (
-                <span key={i} className="text-footnote tabular-nums" style={rango?.hiKg != null && p.kg >= rango.hiKg ? { color: 'var(--v2-atento-texto)' } : undefined}>{kg2(p.kg)}</span>
+                <span key={i} className="text-footnote tabular-nums" style={rango?.hiKg != null && p.kg >= rango.hiKg ? { color: 'var(--v2-atento-texto)' } : undefined}>{kg2(p.kg)} <span className="text-nota text-muted-foreground">{kgALbTxt(p.kg)}</span></span>
               ))}
             </p>
-            <p className="mt-0.5 text-nota text-muted-foreground">kg{programa ? ` · ${programaTxt(programa)}` : ''}{sinPunto > 0 ? ` · ${sinPunto} sin peso` : ''}</p>
+            <p className="mt-0.5 text-nota text-muted-foreground">kg y lb{programa ? ` · ${programaTxt(programa)}` : ''}{sinPunto > 0 ? ` · ${sinPunto} sin peso` : ''}</p>
           </>
         )}
       </div>

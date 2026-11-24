@@ -8,6 +8,8 @@ import { calibrePorPeso } from './pescaVivo'
 import { rangoProgramaKg } from './seteoGatesVivo'
 
 const KG_POR_LB = 0.453592
+/** Un peso en kg dicho en libras, con un decimal y coma: 4,59 kg → «10,1 lb». */
+export const kgALbTxt = (kg: number) => `${(kg / KG_POR_LB).toFixed(1).replace('.', ',')} lb`
 export const VENTANA_GATE_MIN = 60
 /** Paso de la curva de una gate con programa (50 g) y de Gate 0 (100 g). */
 export const PASO_GATE_KG = 0.05
