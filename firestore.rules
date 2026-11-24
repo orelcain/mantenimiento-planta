@@ -1977,6 +1977,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // e1.10: pedido manual de Puerta 0 («Actualizar causas P0» en el monitor). La función de ingesta lo devuelve al
+    // lector en su próximo envío y el lector lo atiende una vez. pedidoEn = hora del servidor (identifica el pedido);
+    // como mucho un pedido por minuto por línea.
+    match /graderEspejoPedidoP0/{linea} {
+      allow read: if isNotAnonymous();
+      allow create, update: if isNotAnonymous()
+        && linea.matches('^[a-z0-9_-]{1,40}$')
+        && request.resource.data.keys().hasOnly(['pedidoPor', 'pedidoNombre', 'pedidoEn'])
+        && request.resource.data.pedidoPor == request.auth.uid
+        && request.resource.data.pedidoEn == request.time
+        && request.resource.data.pedidoNombre is string
+        && request.resource.data.pedidoNombre.size() <= 60
+        && (resource == null || request.time > resource.data.pedidoEn + duration.value(1, 'm'));
+      allow delete: if false;
+    }
+
     // E1.3: versión del lector que debe correr en planta. Solo un admin la publica.
     match /graderEspejoVersion/{doc} {
       allow read: if isNotAnonymous();

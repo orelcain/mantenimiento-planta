@@ -1,10 +1,10 @@
 /**
- * Instalador del lector del espejo del grader (e1.9) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la sesión despierta desde el propio lector (y la devuelve al salir), abre Matrix si no corre y rellena solo los huecos del espejo dentro del rango que muestra Matrix; con el archivo PERIODO elige una vez un periodo relativo del informe (acciona solo la casilla «Limitar», «Actualizar» y, encendido, la opción de periodo).
+ * Instalador del lector del espejo del grader (e1.10) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, mantiene la sesión despierta, abre Matrix si no corre (y lo minimiza), rellena los huecos del espejo y lee «Puerta 0» (pasiva siempre; con el archivo ALTERNAR cambia de informe y vuelve verificando); acciona solo la casilla «Limitar», «Actualizar», con PERIODO la opción de periodo y con ALTERNAR los controles de nombre exacto «Puerta 0» y «Pieza pieza Grader».
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader (e1.9). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Instalador del lector del espejo del grader (e1.10). Pegar TODO en PowerShell y Enter. Un solo pegado.
   # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
   # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
   # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
@@ -98,6 +98,9 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 #   3. el botón «Actualizar» (InvokePattern.Invoke);
 #   4. e1.9, solo con el archivo <dir>\\PERIODO: la opción del combo de periodo (SelectionItemPattern.Select), una vez por
 #      archivo, sin desplegar el combo.
+#   5. e1.10, solo con el archivo <dir>\\ALTERNAR: la pestaña, el botón o la opción de menú de nombre EXACTO «Puerta 0» y
+#      la de «Pieza pieza Grader» para volver (InvokePattern.Invoke; el menú se abre con ExpandCollapsePattern.Expand).
+#      En «Puerta 0» solo desmarca «Limitar» y pulsa «Actualizar» una vez. Nunca lista, árbol ni combo.
 # Si no encuentra EXACTAMENTE 2 fechas editables y 1 casilla «Limitar el informe», no toca ni el rango ni la casilla.
 # Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
 # e1.5: la casilla se revisa en cada «Actualizar» aunque las fechas fallen. Matrix (Qt) ignora la escritura de sus
@@ -155,7 +158,23 @@ $ErrorActionPreference = 'Continue'
 #   · Con el informe fuera de «Usuario definido» (elegido por el lector o a mano) no escribe las fechas; si quedan de solo
 #     lectura igual desmarca «Limitar». Tras un cambio de periodo re-ancla por contenido.
 #   · Latido: clave «periodo» (24 de 24): «<estado>[:<opción>] valor=<valor> ops=<opciones>», tope 200.
-$VERSION = 'e1.9'
+
+# e1.10 — informe «Puerta 0» (el motivo real de cada pieza en gate 0). Va en envíos propios (informe 'p0') con su estado
+# aparte (graderEspejoEstado.p0): el latido de pieza sigue con sus 24 claves.
+#   · Pasiva (siempre): si Matrix ya muestra «Puerta 0» (alguien lo dejó ahí), la lee sin tocar nada: cuando cambia su
+#     número de filas, cada 30 min o a pedido. El latido de pieza sigue diciendo «otro-informe».
+#   · Alternancia, APAGADA por defecto. Interruptor: el archivo <dir>\\ALTERNAR (vacío = cualquier vía; con texto
+#     pestana | boton | menu = solo esa). Cada hora, al cierre de turno (entre +10 y +55 min de las 07:00 y las 19:00) y a
+#     pedido («Actualizar causas P0» en el monitor: la respuesta trae p0Pedido; se atiende una vez por pedido). Solo tras
+#     un ciclo de pieza sano y enviado, nunca en recarga, con huecos por rellenar ni con la sesión bloqueada. Exige
+#     exactamente un «Puerta 0» y un «Pieza pieza Grader» de la misma vía. Lee la tabla entera a memoria (tope
+#     ESPEJO_TOPE_P0 s, 240), vuelve SIEMPRE a «Pieza pieza Grader» verificando el encabezado y recién entonces envía.
+#     Si no vuelve, no reintenta: deja alternar-bloqueado.txt con la marca de ALTERNAR y no alterna más hasta que se
+#     vuelva a escribir ALTERNAR. Una marca en p0.json avisa si el lector murió a medias: al arrancar intenta la vuelta.
+#   · Con ALTERNAR apagado, un pedido se contesta «apagado» (sin filas) para que el monitor lo diga.
+#   · Matrix reabierto por el lector: Qt suele ignorar el «minimizado» del arranque; durante 60 s el lector minimiza las
+#     ventanas del proceso recién lanzado (WindowPattern.SetWindowVisualState). Sin verificar en planta.
+$VERSION = 'e1.10'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -190,6 +209,9 @@ $topeHueco = 90
 if ($env:ESPEJO_TOPE_HUECO) { $topeHueco = [double]$env:ESPEJO_TOPE_HUECO }
 $minConteos = 30
 if ($env:ESPEJO_MIN_CONTEOS) { $minConteos = [double]$env:ESPEJO_MIN_CONTEOS }
+# e1.10: tope de la lectura de «Puerta 0» (s).
+$topeP0 = 240
+if ($env:ESPEJO_TOPE_P0) { $topeP0 = [double]$env:ESPEJO_TOPE_P0 }
 $equipo =([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
 if ($env:ESPEJO_EQUIPO) { $equipo = ([string]$env:ESPEJO_EQUIPO) -replace '[^A-Za-z0-9_-]', '' }
 if ($equipo.Length -gt 40) { $equipo = $equipo.Substring(0, 40) }
@@ -198,6 +220,8 @@ if (-not $equipo) { $equipo = 'PC' }
 # Informes aceptados: solo el encabezado EXACTO. Cualquier otra tabla no se lee.
 $INFORMES = @{
   'Pieza pieza Grader' = @('Fecha', 'Hora', 'Peso de las piezas', 'Cantidad de piezas', 'Lote', 'Gate', 'Calidad', 'Conservacion', 'Calibre', 'Producto', 'Turno')
+  # e1.10: solo se lee pasiva o con ALTERNAR; Fecha y Hora van en las columnas 2 y 3.
+  'Puerta 0' = @('Especie', 'Lote', 'Fecha', 'Hora', 'Turno', 'Gate', 'Cantidad de piezas', 'Calidad', 'Peso de las piezas', 'Error', 'peso en Gr')
 }
 $FORMATO_FECHA = '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$'
 $LIMITE_LOG = 1MB
@@ -227,6 +251,10 @@ $archivoActualiz = Join-Path $dir 'actualiz.txt'
 # e1.7: ruta del Matrix que se vio corriendo y registro de las veces que el lector lo abrió.
 $archivoRutaMatrix = Join-Path $dir 'matrix-ruta.txt'
 $archivoAbrir = Join-Path $dir 'abrir.json'
+# e1.10: interruptor de la alternancia a «Puerta 0», su bloqueo tras una vuelta fallida y el estado de Puerta 0.
+$archivoAlternar = Join-Path $dir 'ALTERNAR'
+$archivoAlternarBloq = Join-Path $dir 'alternar-bloqueado.txt'
+$archivoP0 = Join-Path $dir 'p0.json'
 $TAREA ='Espejo del grader'
 if ($env:ESPEJO_TAREA) { $TAREA = $env:ESPEJO_TAREA }
 $UTF8 = New-Object System.Text.UTF8Encoding($false)
@@ -375,12 +403,20 @@ function Fila-Celdas($gp, [int]$r) {
   return , $c
 }
 
+# Encabezado idéntico a la lista blanca (mismas columnas, mismo orden).
+function Calza-Encabezado($enc, $esp) {
+  $enc = @($enc)
+  if ($enc.Count -ne $esp.Count) { return $false }
+  for ($i = 0; $i -lt $esp.Count; $i++) { if ([string]$enc[$i] -ne $esp[$i]) { return $false } }
+  return $true
+}
+
 # Foto de Matrix: informe, tabla más grande y campos. Devuelve error ('' si la tabla es «Pieza pieza Grader»).
 function Foto {
   $acc = @{ grillas = (New-Object System.Collections.Generic.List[object]); casillas = (New-Object System.Collections.Generic.List[object]); fechas = (New-Object System.Collections.Generic.List[string]); licencia = $false; visitados = 0; procesos = 0 }
   $reloj = [Diagnostics.Stopwatch]::StartNew()
   Escanea $acc $reloj
-  $f = @{ error = ''; el = $null; gp = $null; filas = 0; rango = [string[]]@(); limite = $false }
+  $f = @{ error = ''; el = $null; gp = $null; filas = 0; rango = [string[]]@(); limite = $false; p0 = $null }
   $f.rango = [string[]]@($acc.fechas | Select-Object -First 4)
   $f.limite = (@($acc.casillas | Where-Object { $_.nombre -match '(?i)limit' -and $_.estado -eq 'On' }).Count -gt 0)
   if ($acc.procesos -eq 0) { $f.error = 'sin-matrix'; return $f }
@@ -399,10 +435,12 @@ function Foto {
     $tp = $mejor.El.GetCurrentPattern([System.Windows.Automation.TablePattern]::Pattern)
     $enc = @($tp.Current.GetColumnHeaders() | ForEach-Object { ([string]$_.Current.Name).Trim() })
   } catch { }
-  $esp = $INFORMES['Pieza pieza Grader']
-  $calza = ($enc.Count -eq $esp.Count)
-  if ($calza) { for ($i = 0; $i -lt $esp.Count; $i++) { if ($enc[$i] -ne $esp[$i]) { $calza = $false; break } } }
-  if (-not $calza) { $f.error = 'otro-informe'; return $f }
+  if (-not (Calza-Encabezado $enc $INFORMES['Pieza pieza Grader'])) {
+    $f.error = 'otro-informe'
+    # e1.10: con «Puerta 0» a la vista, su tabla queda para la lectura pasiva (el latido de pieza sigue «otro-informe»).
+    if (Calza-Encabezado $enc $INFORMES['Puerta 0']) { $f.p0 = @{ el = $mejor.El; gp = $mejor.Gp; filas = $mejor.Filas } }
+    return $f
+  }
   $f.el = $mejor.El
   $f.gp = $mejor.Gp
   $f.filas = $mejor.Filas
@@ -818,8 +856,9 @@ function Espera-Ciclo([double]$cadaSeg, $finVivo, [datetime]$ahora) {
 }
 
 # Envía un lote. Devuelve: ok | reintento | fin (401/403: el lector termina).
-function Envia($filas, $estC) {
-  $cuerpo = @{ v = 1; equipo = $equipo; informe = 'pieza'; leidoEn = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); filas = [object[]]@($filas); estado = $estC }
+# e1.10: $informe = 'p0' para las filas de «Puerta 0» (su estado va aparte en el servidor).
+function Envia($filas, $estC, [string]$informe = 'pieza') {
+  $cuerpo = @{ v = 1; equipo = $equipo; informe = $informe; leidoEn = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); filas = [object[]]@($filas); estado = $estC }
   $json = ConvertTo-Json -InputObject $cuerpo -Depth 5 -Compress
   $bytes = $UTF8.GetBytes($json)
   $code = -1
@@ -840,6 +879,9 @@ function Envia($filas, $estC) {
     if ($detener) { Log 'HTTP 200 con detener=true: el lector termina.'; Marca-Revocada; return 'fin' }
     $script:actualizar = $null
     if ($jr -and $jr.actualizar) { $script:actualizar = $jr.actualizar }
+    # e1.10: pedido de Puerta 0, tal cual (del texto crudo: PowerShell 7 convertiría el ISO a fecha y el monitor lo
+    # compara letra por letra). Sin campo = sin pedido vigente.
+    $script:p0Pedido = Iso-Pedido $cuerpoResp
     # e1.4: cada 200 dice si sigue el modo vivo (sin vivoSeg = vuelve a ESPEJO_CADA). Un envío fallido no lo toca.
     $antes = $script:vivoFin
     $script:vivoFin = $null
@@ -859,11 +901,12 @@ function Envia($filas, $estC) {
 # e1.6: $recarga = lectura entera del rango de Matrix (solo casilla, sin corte, no lee con «Limitar» marcada);
 # $reanclar = buscar el ancla por contenido aunque no se haya tocado nada (al volver de una recarga).
 function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool]$reanclar = $false) {
-  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = ''; reancla = '' }
+  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = ''; reancla = ''; p0 = $null }
   $foto = Foto
   $res.rango = $foto.rango
   $res.limite = $foto.limite
-  if ($foto.error) { $res.error = $foto.error; return $res }
+  # e1.10: «Puerta 0» a la vista: no se pulsa nada; la tabla queda para la lectura pasiva.
+  if ($foto.error) { $res.error = $foto.error; $res.p0 = $foto.p0; return $res }
   $res.ftabla = $foto.filas
   $script:ultFoto = @{ ftabla = $foto.filas; rango = $foto.rango; limite = $foto.limite }
 
@@ -941,6 +984,8 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
   $res.lec = $lec
   # e1.7: la misma tabla, ya estable, sirve para buscar y rellenar huecos en este ciclo.
   $res.gp = $foto.gp
+  # e1.10: la grilla de pieza, desde donde se busca el selector de informes.
+  $res.el = $foto.el
   $res.base = $(if ($lec.relectura) { 0 } else { $estado.piezas })
   return $res
 }
@@ -1243,6 +1288,8 @@ function Abre-Matrix([datetime]$ahora) {
   $txt = ConvertTo-Json -InputObject @{ veces = [string[]]@($veces | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ss') }) } -Compress
   try { [IO.File]::WriteAllText($archivoAbrir, $txt, $UTF8) } catch { }
   if (-not (Lanza-Minimizado $ruta)) { Log ('matrix: no se pudo abrir ' + $ruta); return 'no-abre fallo' }
+  # e1.10: tras el latido, 60 s minimizando las ventanas que abra (Qt suele ignorar el minimizado del arranque).
+  $script:minimizar = @{ desde = $ahora; hasta = (Get-Date).AddSeconds(60) }
   Log ('matrix: no corría; el lector lo abrió minimizado (' + $ruta + ', vez ' + $veces.Count + ' en 24 h). No toca nada más de Matrix.')
   return ('abierto-por-lector ' + $ahora.ToString('yyyy-MM-dd HH:mm'))
 }
@@ -1469,6 +1516,492 @@ function Paso-Huecos($gp, [int]$filas, [string[]]$rango, $estC) {
   return $out
 }
 
+# ---- e1.10: Puerta 0 (puro) ----
+# Nombres EXACTOS (tras quitar tildes, mayúsculas y espacios de más) del control que elige cada informe.
+$RE_INF_P0 = '^puerta 0$'
+$RE_INF_PIEZA = '^pieza (a )?pieza grader$'
+$VIAS_P0 = [string[]]@('pestana', 'boton', 'menu')
+$FMT_P0 = 'yyyy-MM-dd HH:mm:ss'
+
+# p0Pedido de la respuesta CRUDA de la función: el ISO tal cual ('' si no viene o no tiene forma de ISO en UTC).
+function Iso-Pedido([string]$crudo) {
+  if (-not $crudo) { return '' }
+  $m = [regex]::Match($crudo, '"p0Pedido"\\s*:\\s*"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z)"')
+  if ($m.Success) { return $m.Groups[1].Value }
+  return ''
+}
+
+function Fecha-P0([string]$s) {
+  $t = [datetime]::MinValue
+  if ([datetime]::TryParseExact($s, $FMT_P0, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) { return $t }
+  return $null
+}
+
+# Cierre de turno en curso: 'yyyy-MM-dd HH' del cambio de turno (07 o 19) si ahora cae entre +10 y +55 min; '' si no.
+function Clave-Cierre([datetime]$ahora) {
+  foreach ($h in @(7, 19)) {
+    $t = $ahora.Date.AddHours($h)
+    $min = ($ahora - $t).TotalMinutes
+    if ($min -ge 10 -and $min -lt 55) { return $t.ToString('yyyy-MM-dd HH') }
+  }
+  return ''
+}
+
+# Por qué alternar a «Puerta 0» ahora: pedido (uno no atendido) | cierre | hora | ''. $st = p0.json: hora (último
+# intento, «yyyy-MM-dd HH:mm:ss»), cierre (último cierre leído) y pedido (último ISO atendido).
+function Motivo-P0([datetime]$ahora, $st, [string]$pedido) {
+  if ($pedido -and $pedido -ne [string]$st.pedido) { return 'pedido' }
+  $c = Clave-Cierre $ahora
+  if ($c -and $c -ne [string]$st.cierre) { return 'cierre' }
+  $t = Fecha-P0 ([string]$st.hora)
+  # Sin intento previo, reloj movido hacia atrás o una hora desde el último intento.
+  if (-not $t -or $t -gt $ahora.AddMinutes(1) -or ($ahora - $t).TotalMinutes -ge 60) { return 'hora' }
+  return ''
+}
+
+# Celdas leídas de «Puerta 0» → filas del contrato (11 celdas + #n). #n = cuántas veces apareció antes la MISMA fila
+# completa en toda la tabla (diccionario de la tabla entera: no supone orden). Descarta lo que la función rechazaría
+# (sin fecha u hora válidas, más de 300 caracteres, #n de más de 4 cifras): una sola fila mala tumba el lote entero.
+# primera/ultima = la menor y la mayor «fecha hora» enviada.
+function Filas-P0($celdas) {
+  $dict = Nuevo-Diccionario
+  $out = New-Object System.Collections.Generic.List[string]
+  $primera = ''
+  $ultima = ''
+  $malas = 0
+  # Sin @(): con una List[object] de arreglos, @() falla («Los tipos de argumentos no coinciden»).
+  foreach ($c0 in $celdas) {
+    $c = [string[]]@(@($c0) | ForEach-Object { ([string]$_ -replace '[\\t\\r\\n]', ' ').Trim() })
+    if ($c.Count -ne 11 -or $c[2] -notmatch '^\\d{4}-\\d{2}-\\d{2}$' -or $c[3] -notmatch '^\\d{2}:\\d{2}:\\d{2}$') { $malas++; continue }
+    $clave = $c -join "\`t"
+    $ord = 0
+    if ($dict.ContainsKey($clave)) { $ord = $dict[$clave] }
+    $dict[$clave] = $ord + 1
+    $fila = $clave + "\`t#" + [string]$ord
+    if ($ord -gt 9999 -or $fila.Length -gt 300) { $malas++; continue }
+    $out.Add($fila)
+    $s = $c[2] + ' ' + $c[3]
+    if (-not $primera -or [string]::CompareOrdinal($s, $primera) -lt 0) { $primera = $s }
+    if (-not $ultima -or [string]::CompareOrdinal($s, $ultima) -gt 0) { $ultima = $s }
+  }
+  return @{ filas = $out; primera = $primera; ultima = $ultima; malas = $malas }
+}
+
+# Vía para cambiar de informe. $cands: @{ via; nombre } (solo pestaña, botón u opción de menú con Invoke). Vale la primera
+# vía de $vias con EXACTAMENTE un «Puerta 0» y un «Pieza pieza Grader». Si ninguna: varios (dos o más iguales) >
+# sin-vuelta (hay «Puerta 0» pero no la vuelta) > sin-selector. Devuelve @{ resultado; via }.
+function Selector-Via($cands, [string[]]$vias) {
+  $rango = @{ 'sin-selector' = 0; 'sin-vuelta' = 1; 'varios' = 2 }
+  $peor = 'sin-selector'
+  foreach ($v in @($vias)) {
+    $p0 = @(@($cands) | Where-Object { $_ -and $_.via -eq $v -and (Normaliza-Texto $_.nombre) -match $RE_INF_P0 }).Count
+    $pz = @(@($cands) | Where-Object { $_ -and $_.via -eq $v -and (Normaliza-Texto $_.nombre) -match $RE_INF_PIEZA }).Count
+    if ($p0 -eq 1 -and $pz -eq 1) { return @{ resultado = ''; via = $v } }
+    $r = 'sin-selector'
+    if ($p0 -gt 1 -or $pz -gt 1) { $r = 'varios' }
+    elseif ($p0 -eq 1) { $r = 'sin-vuelta' }
+    if ($rango[$r] -gt $rango[$peor]) { $peor = $r }
+  }
+  return @{ resultado = $peor; via = '' }
+}
+
+# Interruptor ALTERNAR: @{ on; vias; marca; bloqueado }. Texto del archivo = una sola vía (pestana | boton | menu);
+# otro texto = ninguna. bloqueado = una vuelta falló con ESTA misma marca de ALTERNAR (se desbloquea reescribiéndolo).
+function Alternar-Config {
+  $r = @{ on = $false; vias = $VIAS_P0; marca = ''; bloqueado = $false }
+  try {
+    if (-not (Test-Path -LiteralPath $archivoAlternar)) { return $r }
+    $r.marca = [string](Get-Item -LiteralPath $archivoAlternar).LastWriteTimeUtc.Ticks
+  } catch { return $r }
+  $r.on = $true
+  $t = ''
+  try { $t = Normaliza-Texto ([IO.File]::ReadAllText($archivoAlternar)) } catch { }
+  if ($t) { $r.vias = [string[]]@($VIAS_P0 | Where-Object { $_ -eq $t }) }
+  try {
+    if ((Test-Path -LiteralPath $archivoAlternarBloq) -and ([IO.File]::ReadAllText($archivoAlternarBloq)).Trim().Split("\`t")[0] -eq $r.marca) { $r.bloqueado = $true }
+  } catch { }
+  return $r
+}
+
+function Bloquea-Alternar([string]$marca, [string]$motivo) {
+  try { [IO.File]::WriteAllText($archivoAlternarBloq, ($marca + "\`t" + (Get-Date).ToString($FMT_P0) + "\`t" + $motivo), $UTF8) } catch { }
+  Log ('p0: alternancia bloqueada (' + $motivo + '). No vuelve a alternar hasta que se escriba de nuevo ALTERNAR.')
+}
+
+# Estado de Puerta 0 que viaja en los envíos 'p0' (graderEspejoEstado.p0; claves fijas, muy por debajo de 24).
+function Estado-P0([string]$resultado, [int]$filas, [string]$primera, [string]$ultima, [string]$motivo, [string]$pedido, [string]$via, [bool]$volvio, [string]$cambio) {
+  return @{ resultado = $resultado; filas = $filas; primera = $primera; ultima = $ultima; motivo = $motivo; pedido = $pedido; via = $via; volvio = $volvio; cambio = $cambio; version = $VERSION }
+}
+
+# Rango o casilla «Limitar» distintos al volver a «Pieza pieza Grader» ('' si quedaron igual). Tope 200.
+function Texto-Cambio($antes, $despues) {
+  $p = New-Object System.Collections.Generic.List[string]
+  $a = (@($antes.rango) -join ' a ')
+  $d = (@($despues.rango) -join ' a ')
+  if ($a -ne $d) { $p.Add('rango ' + $a + ' -> ' + $d) }
+  if ([bool]$antes.limite -ne [bool]$despues.limite) { $p.Add('limitar ' + $(if ($despues.limite) { 'marcada' } else { 'desmarcada' })) }
+  $t = $p -join '; '
+  if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
+  return $t
+}
+
+# p0.json: último intento de alternar, último cierre leído, último pedido atendido, última lectura pasiva y la marca de
+# una alternancia en curso (si el lector muere a medias, el siguiente intenta volver al arrancar).
+function Lee-EstadoP0 {
+  $e = @{ hora = ''; cierre = ''; pedido = ''; pasivaEn = ''; pasivaFilas = -1; enCurso = $null }
+  if (-not (Test-Path -LiteralPath $archivoP0)) { return $e }
+  try {
+    $j = Get-Content -LiteralPath $archivoP0 -Raw -Encoding UTF8 | ConvertFrom-Json
+    $e.hora = [string]$j.hora
+    $e.cierre = [string]$j.cierre
+    # PowerShell 7 convierte el ISO a fecha al leer el JSON; PowerShell 5.1 (planta) lo deja como texto.
+    if ($j.pedido -is [datetime]) { $e.pedido = $j.pedido.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ') } else { $e.pedido = [string]$j.pedido }
+    $e.pasivaEn = [string]$j.pasivaEn
+    if ($null -ne $j.pasivaFilas) { $e.pasivaFilas = [int]$j.pasivaFilas }
+    if ($j.enCurso) { $e.enCurso = @{ via = [string]$j.enCurso.via; desde = [string]$j.enCurso.desde; marca = [string]$j.enCurso.marca } }
+  } catch { Log 'p0.json ilegible: se empieza de cero.' }
+  return $e
+}
+function Guarda-EstadoP0($e) {
+  try {
+    $tmp = $archivoP0 + '.tmp'
+    [IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject $e -Depth 4), $UTF8)
+    Move-Item -LiteralPath $tmp -Destination $archivoP0 -Force
+  } catch { Log ('p0.json no guardado: ' + $_.Exception.Message) }
+}
+
+# ---- e1.10: Puerta 0 (UI Automation) ----
+$TIPOS_VIA = @{ 'ControlType.TabItem' = 'pestana'; 'ControlType.Button' = 'boton'; 'ControlType.RadioButton' = 'boton'; 'ControlType.MenuItem' = 'menu' }
+# Menú de la barra que puede tener los informes (se abre solo si es exactamente uno).
+$RE_MENU_INFORMES = '^(informes?|reports?|ver|view|ventana|window|listados?)$'
+
+function Tiene-Patron($e, $prop) { try { return [bool]$e.GetCurrentPropertyValue($prop) } catch { return $false } }
+
+# Junta los candidatos @{ via; nombre; el } (pestaña, botón u opción de menú con Invoke y nombre exacto de informe;
+# nunca lista, árbol ni combo) y los menús de la barra con nombre de informes (@{ nombre; el } con ExpandCollapse).
+function Busca-Nodo($e, [int]$nivel, $acc, $reloj, [bool]$enBarra) {
+  if ($acc.visitados -ge 4000 -or $nivel -gt 18 -or $reloj.Elapsed.TotalSeconds -gt 20) { return }
+  $acc.visitados++
+  $tipo = ''
+  $nom = ''
+  try { $tipo = [string]$e.Current.ControlType.ProgrammaticName; $nom = [string]$e.Current.Name } catch { return }
+  $n = Normaliza-Texto $nom
+  if ($TIPOS_VIA.ContainsKey($tipo) -and ($n -match $RE_INF_P0 -or $n -match $RE_INF_PIEZA) -and (Tiene-Patron $e $AE::IsInvokePatternAvailableProperty)) {
+    $acc.cands.Add(@{ via = $TIPOS_VIA[$tipo]; nombre = $nom; el = $e })
+  }
+  if ($enBarra -and $tipo -eq 'ControlType.MenuItem' -and $n -match $RE_MENU_INFORMES -and (Tiene-Patron $e $AE::IsExpandCollapsePatternAvailableProperty)) {
+    $acc.menus.Add(@{ nombre = $nom; el = $e })
+  }
+  $h = $null
+  try { $h = $WALK.GetFirstChild($e) } catch { }
+  $k = 0
+  while ($h -and $k -lt 300) {
+    Busca-Nodo $h ($nivel + 1) $acc $reloj ($tipo -eq 'ControlType.MenuBar')
+    $k++
+    try { $h = $WALK.GetNextSibling($h) } catch { $h = $null }
+  }
+}
+
+# La ventana y las demás ventanas de su proceso (en Qt el menú abierto es una ventana aparte).
+function Ventanas-Proceso($ventana) {
+  $l = New-Object System.Collections.Generic.List[object]
+  if (-not $ventana) { return , $l }
+  $l.Add($ventana)
+  try {
+    $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, [int]$ventana.Current.ProcessId)
+    foreach ($v in $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)) {
+      if (-not [System.Windows.Automation.Automation]::Compare($v, $ventana)) { $l.Add($v) }
+    }
+  } catch { }
+  return , $l
+}
+
+function Busca-Informes($ventana) {
+  $acc = @{ cands = (New-Object System.Collections.Generic.List[object]); menus = (New-Object System.Collections.Generic.List[object]); visitados = 0 }
+  $reloj = [Diagnostics.Stopwatch]::StartNew()
+  foreach ($r in (Ventanas-Proceso $ventana)) { Busca-Nodo $r 0 $acc $reloj $false }
+  return $acc
+}
+
+function Cierra-Menu($m) {
+  if (-not $m) { return }
+  try { $m.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse() } catch { }
+}
+
+# Candidatos de una vía. Para «menu», si sus opciones no están a la vista, abre (Expand) el ÚNICO menú de la barra con
+# nombre de informes y las busca ahí; devuelve ese menú para cerrarlo si no se usa. @{ cands; menu }
+function Candidatos-Via($ventana, [string]$via) {
+  $b = Busca-Informes $ventana
+  $out = @{ cands = @($b.cands | Where-Object { $_.via -eq $via }); menu = $null }
+  if ($via -ne 'menu' -or $out.cands.Count -gt 0 -or $b.menus.Count -ne 1) { return $out }
+  $m = $b.menus[0].el
+  try { $m.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand() } catch { return $out }
+  $out.menu = $m
+  Start-Sleep -Milliseconds 600
+  $out.cands = @((Busca-Informes $ventana).cands | Where-Object { $_.via -eq 'menu' })
+  return $out
+}
+
+# Busca de nuevo (los controles pueden rehacerse al cambiar de informe) y pulsa el único control de esa vía con ese
+# nombre. $true si el Invoke no falló.
+function Invoca-Informe($ventana, [string]$via, [string]$re) {
+  $cv = Candidatos-Via $ventana $via
+  $obj = @($cv.cands | Where-Object { (Normaliza-Texto $_.nombre) -match $re })
+  if ($obj.Count -ne 1) { Cierra-Menu $cv.menu; Log ('p0: en la vía ' + $via + ' hay ' + $obj.Count + ' controles para ' + $re + '.'); return $false }
+  try { $obj[0].el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); return $true }
+  catch { Cierra-Menu $cv.menu; Log ('p0: Invoke de «' + $obj[0].nombre + '» falló: ' + $_.Exception.Message); return $false }
+}
+
+# Espera hasta que la tabla grande sea de ese informe ('p0' | 'pieza'). Sin DETENER: también corre en la vuelta.
+function Espera-Informe([string]$cual, [double]$seg) {
+  $t = [Diagnostics.Stopwatch]::StartNew()
+  while ($true) {
+    $f = Foto
+    if ($cual -eq 'p0' -and $f.p0) { return $f }
+    if ($cual -eq 'pieza' -and -not $f.error) { return $f }
+    if ($t.Elapsed.TotalSeconds -ge $seg) { return $null }
+    Start-Sleep -Milliseconds 1000
+  }
+}
+
+# Tres lecturas iguales de RowCount separadas 2 s. -1 si no se estabiliza antes del tope.
+function Filas-Estables($gp, [double]$tope) {
+  $ult = -1
+  $iguales = 0
+  $t = [Diagnostics.Stopwatch]::StartNew()
+  while ($t.Elapsed.TotalSeconds -lt $tope) {
+    $n = -1
+    try { $n = [int]$gp.Current.RowCount } catch { return -1 }
+    if ($n -eq $ult) { $iguales++ } else { $iguales = 1; $ult = $n }
+    if ($iguales -ge 3) { return $n }
+    Start-Sleep -Milliseconds 2000
+  }
+  return -1
+}
+
+# Lee la tabla de «Puerta 0» entera a memoria (tope en segundos: entonces parcial).
+function Lee-CeldasP0($gp, [int]$filas, [double]$tope) {
+  $l = New-Object System.Collections.Generic.List[object]
+  $t = [Diagnostics.Stopwatch]::StartNew()
+  for ($r = 0; $r -lt $filas; $r++) {
+    if ($t.Elapsed.TotalSeconds -ge $tope) { return @{ celdas = $l; parcial = $true } }
+    $l.Add((Fila-Celdas $gp $r))
+  }
+  return @{ celdas = $l; parcial = $false }
+}
+
+# En «Puerta 0»: desmarca «Limitar el informe» si hay exactamente una y está marcada.
+function Desmarca-Limitar($ventana) {
+  if (-not $ventana) { return }
+  $acc = @{ grillas = (New-Object System.Collections.Generic.List[object]); casillas = (New-Object System.Collections.Generic.List[object]); fechas = (New-Object System.Collections.Generic.List[string]); licencia = $false; visitados = 0; procesos = 0 }
+  Recorre $ventana 0 $acc ([Diagnostics.Stopwatch]::StartNew())
+  $lim = @($acc.casillas | Where-Object { $_.nombre -match '^\\s*Limitar el informe' })
+  if ($lim.Count -ne 1 -or $lim[0].estado -ne 'On') { return }
+  try { $lim[0].el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() } catch { }
+  Log ('p0: casilla «Limitar» de «Puerta 0» ' + $(if ((Estado-Casilla $lim[0].el) -eq 'Off') { 'desmarcada.' } else { 'sigue marcada.' }))
+}
+
+# Alternancia completa desde «Pieza pieza Grader» ($pieza = @{ el; rango; limite } del ciclo sano). Lee a memoria, vuelve
+# SIEMPRE (finally) verificando el encabezado de pieza y recién después se envía. Devuelve @{ resultado; filas;
+# primera; ultima; via; volvio; cambio }.
+function Alterna-P0($pieza, $cfg) {
+  $r = @{ resultado = ''; filas = (New-Object System.Collections.Generic.List[string]); primera = ''; ultima = ''; via = ''; volvio = $true; cambio = '' }
+  $ventana = Ventana-Raiz $pieza.el
+  if (-not $ventana) { $r.resultado = 'sin-selector'; return $r }
+  $todos = New-Object System.Collections.Generic.List[object]
+  foreach ($v in @($cfg.vias)) {
+    $cv = Candidatos-Via $ventana $v
+    foreach ($x in $cv.cands) { $todos.Add($x) }
+    $s = Selector-Via $cv.cands @($v)
+    Cierra-Menu $cv.menu
+    if (-not $s.resultado) { $r.via = $v; break }
+  }
+  if (-not $r.via) { $r.resultado = (Selector-Via $todos.ToArray() $cfg.vias).resultado; return $r }
+  $st = Lee-EstadoP0
+  $st.enCurso = @{ via = $r.via; desde = (Get-Date).ToString($FMT_P0); marca = [string]$cfg.marca }
+  Guarda-EstadoP0 $st
+  try {
+    if (-not (Invoca-Informe $ventana $r.via $RE_INF_P0)) { $r.resultado = 'error' }
+    else {
+      $fp = Espera-Informe 'p0' 30
+      if (-not $fp) { $r.resultado = 'no-cambia' }
+      else {
+        Desmarca-Limitar (Ventana-Raiz $fp.p0.el)
+        $bot = Boton-Actualizar (Ventana-De $fp.p0.el)
+        if ($bot) {
+          try { $bot.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() } catch { Log ('p0: «Actualizar» falló: ' + $_.Exception.Message) }
+          Start-Sleep -Milliseconds ([int]($esperaRecarga * 1000))
+          $fp = Espera-Informe 'p0' 30
+        }
+        $n = -1
+        if ($fp) { $n = Filas-Estables $fp.p0.gp 120 }
+        if ($n -lt 0) { $r.resultado = 'error'; Log 'p0: la tabla de «Puerta 0» no se estabilizó.' }
+        else {
+          $lc = Lee-CeldasP0 $fp.p0.gp $n $script:topeP0Seg
+          $fl = Filas-P0 $lc.celdas
+          $r.filas = $fl.filas
+          $r.primera = $fl.primera
+          $r.ultima = $fl.ultima
+          $r.resultado = $(if ($lc.parcial) { 'parcial' } else { 'leido' })
+          if ($fl.malas) { Log ('p0: ' + $fl.malas + ' filas sin fecha u hora válidas no se envían.') }
+        }
+      }
+    }
+  } catch {
+    $r.resultado = 'error'
+    Log ('p0: error en «Puerta 0» (línea ' + $_.InvocationInfo.ScriptLineNumber + '): ' + $_.Exception.Message)
+  } finally {
+    # La vuelta: si la tabla ya es de pieza no se toca nada; si no, una sola vez, verificando el encabezado.
+    $fz = Foto
+    if ($fz.error) {
+      $fz = $null
+      if (Invoca-Informe $ventana $r.via $RE_INF_PIEZA) { $fz = Espera-Informe 'pieza' 30 }
+    }
+    if ($fz) {
+      $r.volvio = $true
+      $r.cambio = Texto-Cambio $pieza @{ rango = $fz.rango; limite = $fz.limite }
+    } else {
+      $r.volvio = $false
+      $r.resultado = 'no-volvio'
+      Bloquea-Alternar ([string]$cfg.marca) 'no-volvio'
+    }
+    $st = Lee-EstadoP0
+    $st.enCurso = $null
+    Guarda-EstadoP0 $st
+    # De vuelta en pieza: el ancla se busca por contenido y el plan de huecos se rehace (la tabla se recargó).
+    $script:reanclar = $true
+    $script:huecoActual = $null
+    $script:huecosPlan = $null
+  }
+  return $r
+}
+
+# Envía las filas de Puerta 0 por lotes, todas con el estado final. Sin filas, un envío vacío con el estado.
+function Envia-P0($filas, $estP0) {
+  $arr = [string[]]@($filas)
+  if ($arr.Count -eq 0) { return (Envia @() $estP0 'p0') }
+  for ($i = 0; $i -lt $arr.Count; $i += $LOTE_MAX) {
+    $u = [math]::Min($arr.Count, $i + $LOTE_MAX) - 1
+    $resp = Envia ([string[]]$arr[$i..$u]) $estP0 'p0'
+    if ($resp -ne 'ok') { return $resp }
+  }
+  return 'ok'
+}
+
+# Después del latido de pieza. $res = el ciclo de pieza; $sano = ciclo normal completo, enviado, sin huecos pendientes ni
+# bloqueo. Lectura pasiva, alternancia o respuesta a un pedido. Devuelve @{ resp } ('' | ok | reintento | fin).
+function Paso-P0($res, [bool]$sano) {
+  $out = @{ resp = '' }
+  # Un envío de Puerta 0 que falló por red se repite antes que nada (la lectura ya se hizo).
+  if ($script:p0Pendiente) {
+    $out.resp = Envia-P0 $script:p0Pendiente.filas $script:p0Pendiente.est
+    if ($out.resp -ne 'reintento') { $script:p0Pendiente = $null }
+    if ($out.resp -ne 'ok') { return $out }
+  }
+  $ahora = Get-Date
+  $st = Lee-EstadoP0
+  $pedido = [string]$script:p0Pedido
+  if ($pedido -and $pedido -eq [string]$st.pedido) { $pedido = '' }
+  # Pasiva: Matrix ya muestra «Puerta 0»; no se pulsa nada.
+  if ([string]$res.error -eq 'otro-informe' -and $res.p0) {
+    $pas = Fecha-P0 ([string]$st.pasivaEn)
+    $vieja = (-not $pas -or $pas -gt $ahora.AddMinutes(1) -or ($ahora - $pas).TotalMinutes -ge 30)
+    if (-not $pedido -and -not $vieja -and [int]$res.p0.filas -eq [int]$st.pasivaFilas) { return $out }
+    $n = Filas-Estables $res.p0.gp 60
+    if ($n -lt 0) { return $out }
+    $lc = Lee-CeldasP0 $res.p0.gp $n $script:topeP0Seg
+    $fl = Filas-P0 $lc.celdas
+    $est = Estado-P0 $(if ($lc.parcial) { 'parcial' } else { 'pasiva' }) $fl.filas.Count $fl.primera $fl.ultima $(if ($pedido) { 'pedido' } else { 'pasiva' }) $pedido '' $false ''
+    $out.resp = Envia-P0 $fl.filas $est
+    if ($out.resp -eq 'ok') {
+      $st.pasivaEn = $ahora.ToString($FMT_P0)
+      $st.pasivaFilas = [int]$res.p0.filas
+      if ($pedido) { $st.pedido = $pedido }
+      Guarda-EstadoP0 $st
+      Log ('p0: lectura pasiva de «Puerta 0»: ' + $fl.filas.Count + ' filas (' + $fl.primera + ' a ' + $fl.ultima + ')' + $(if ($pedido) { ', a pedido' } else { '' }) + '.')
+    }
+    return $out
+  }
+  $cfg = Alternar-Config
+  $motivo = Motivo-P0 $ahora $st $pedido
+  if (-not $motivo) { return $out }
+  if (-not $cfg.on -or $cfg.bloqueado) {
+    # Sin alternancia solo se contesta el pedido, para que el monitor diga por qué no llega.
+    if ($motivo -ne 'pedido') { return $out }
+    $resu = $(if ($cfg.on) { 'bloqueado' } else { 'apagado' })
+    $out.resp = Envia-P0 @() (Estado-P0 $resu 0 '' '' 'pedido' $pedido '' $true '')
+    if ($out.resp -eq 'ok') { $st.pedido = $pedido; Guarda-EstadoP0 $st; Log ('p0: pedido ' + $pedido + ' contestado «' + $resu + '».') }
+    return $out
+  }
+  # Pospuesto (sin enviar nada): el pedido sigue pendiente mientras valga (1 h). Hora y cierre no van en modo vivo.
+  if (-not $sano) { return $out }
+  if ($motivo -ne 'pedido' -and (Texto-Vivo)) { return $out }
+  # El intento se anota antes de alternar: un fallo no se repite en el ciclo siguiente.
+  $st.hora = $ahora.ToString($FMT_P0)
+  $c = Clave-Cierre $ahora
+  if ($c) { $st.cierre = $c }
+  if ($pedido) { $st.pedido = $pedido }
+  Guarda-EstadoP0 $st
+  Log ('p0: alterna a «Puerta 0» (' + $motivo + ', vías ' + ($cfg.vias -join ',') + ').')
+  $r = Alterna-P0 @{ el = $res.el; rango = [string[]]@($res.rango); limite = [bool]$res.limite } $cfg
+  $est = Estado-P0 $r.resultado $r.filas.Count $r.primera $r.ultima $motivo $pedido $r.via $r.volvio $r.cambio
+  Log ('p0: ' + $r.resultado + ' filas=' + $r.filas.Count + ' via=' + $r.via + ' volvio=' + $r.volvio + $(if ($r.cambio) { ' cambio=' + $r.cambio } else { '' }))
+  $out.resp = Envia-P0 $r.filas $est
+  if ($out.resp -eq 'reintento') { $script:p0Pendiente = @{ filas = $r.filas; est = $est } }
+  return $out
+}
+
+# Al arrancar: si el lector anterior murió con «Puerta 0» a la vista en medio de una alternancia, una sola vuelta
+# verificada; si falla, la alternancia queda bloqueada igual que tras «no-volvio».
+function Recupera-P0 {
+  $st = Lee-EstadoP0
+  if (-not $st.enCurso) { return }
+  $via = [string]$st.enCurso.via
+  $f = Foto
+  if ($f.p0) {
+    Log ('p0: el lector anterior quedó en «Puerta 0» a medias (vía ' + $via + '): intenta volver una vez.')
+    $ventana = Ventana-Raiz $f.p0.el
+    $ok = $false
+    if ($ventana -and $VIAS_P0 -contains $via -and (Invoca-Informe $ventana $via $RE_INF_PIEZA)) { $ok = [bool](Espera-Informe 'pieza' 30) }
+    if ($ok) { Log 'p0: de vuelta en «Pieza pieza Grader».'; $script:reanclar = $true }
+    else { Bloquea-Alternar ([string]$st.enCurso.marca) 'no-volvio al arrancar' }
+  }
+  $st.enCurso = $null
+  Guarda-EstadoP0 $st
+}
+
+# e1.10: Qt suele ignorar el «minimizado» del arranque. Durante el plazo minimiza las ventanas de los procesos de Matrix
+# que arrancaron después de abrirlo (filtro de proceso + hora de inicio, no la ruta: puede ser un lanzador). Sin
+# teclas ni foco. Corre fuera de todo ciclo: no usa Espera (DETENER solo corta la espera).
+function Minimiza-Matrix {
+  $m = $script:minimizar
+  if (-not $m) { return }
+  $script:minimizar = $null
+  $hechas = @{}
+  while ((Get-Date) -lt $m.hasta) {
+    if (Test-Path -LiteralPath $archivoDetener) { break }
+    foreach ($p in @(Get-Process | Where-Object { $_.ProcessName -match $script:filtroProc })) {
+      $ini = $null
+      try { $ini = $p.StartTime } catch { continue }
+      if ($ini -lt $m.desde.AddSeconds(-5)) { continue }
+      try {
+        $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $p.Id)
+        foreach ($v in $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)) {
+          try {
+            $wp = $v.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
+            if ($wp.Current.CanMinimize -and $wp.Current.WindowVisualState -ne [System.Windows.Automation.WindowVisualState]::Minimized) {
+              $wp.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Minimized)
+              $k = [string]$p.Id + ':' + [string]$v.Current.Name
+              if (-not $hechas.ContainsKey($k)) { $hechas[$k] = $true; Log ('matrix: ventana «' + [string]$v.Current.Name + '» minimizada (pid ' + $p.Id + ').') }
+            }
+          } catch { }
+        }
+      } catch { }
+    }
+    Start-Sleep -Milliseconds 1000
+  }
+}
+
 # ---------- Arranque ----------
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $nuevoMutex = $false
@@ -1524,6 +2057,11 @@ $script:reanclar = $false
 # e1.9: clave «periodo» del latido y si el informe está fuera de «Usuario definido» (entonces no se escriben fechas).
 $script:periodoTexto = ''
 $script:periodoRelativo = $false
+# e1.10: pedido de Puerta 0 de la última respuesta, envío de Puerta 0 pendiente por red, tope de lectura y minimizado.
+$script:p0Pedido = ''
+$script:p0Pendiente = $null
+$script:topeP0Seg = $topeP0
+$script:minimizar = $null
 try { [IO.File]::WriteAllText($archivoPid, [string]$PID, $UTF8) } catch { }
 $script:arranque = Modo-Arranque
 $script:actualiz = ''
@@ -1545,6 +2083,8 @@ if (-not $terminar) {
   if ($ra) { $script:actualiz = $ra }
   if ($ra -like 'bajada *') { $terminar = $true }
 }
+# e1.10: una alternancia que quedó a medias (el lector murió en «Puerta 0») intenta volver una vez.
+if (-not $terminar) { try { Recupera-P0 } catch { Log ('p0: error al recuperar: ' + $_.Exception.Message) } }
 $refrescar = $true
 while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
@@ -1717,6 +2257,14 @@ while (-not $terminar) {
   $tipoLat = 'vivo'
   if ($resp -eq 'ok' -and @('excepcion', 'tope-10-min') -notcontains [string]$res.error) { $tipoLat = 'ciclo' }
   Escribe-Latido $tipoLat
+  # e1.10: Puerta 0 (pasiva, alternancia o respuesta a un pedido) después del latido, para que el vigilante vea el ciclo.
+  # Alterna solo tras un ciclo normal sano: sin recarga, todo leído y enviado, sin huecos pendientes ni sesión bloqueada.
+  $sanoP0 = ($resp -eq 'ok' -and -not $rec -and $res.lec -and -not $res.lec.parcial -and -not [string]$res.error -and $envioOk -and -not $huecoSigue -and -not $script:bloqueada)
+  try {
+    $pp = @(Paso-P0 $res ([bool]$sanoP0)) | Where-Object { $_ -is [hashtable] } | Select-Object -Last 1
+    if ($pp -and $pp.resp -eq 'fin') { $terminar = $true; break }
+  } catch { Log ('p0: error ' + $_.Exception.Message) }
+  try { Minimiza-Matrix } catch { }
   # Una versión nueva no se pone en marcha a mitad de un tramo ni de una recarga (la recarga la retoma igual al volver).
   if (($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) -or $script:recarga) { } else {
     $ra = Revisa-Actualizacion

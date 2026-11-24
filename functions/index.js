@@ -1818,15 +1818,11 @@ exports.espejoGraderIngesta = onRequest(
           actualizado: FieldValue.serverTimestamp(),
         }, { merge: true })
       }
-      batch.set(db.collection('graderEspejoEstado').doc(equipo), {
-        equipo,
-        linea,
-        ultimoLatido: FieldValue.serverTimestamp(),
-        leidoEn,
-        informe,
-        estado,
-        llave: prefijo,
-      }, { merge: true })
+      // e1.10: un envío de Puerta 0 deja su estado en `p0` (con su hora de llegada) y no pisa el latido de pieza.
+      const campos = espejoGraderMod.camposEstado({ equipo, linea, informe, leidoEn, estado, prefijo })
+      if (informe === 'p0') campos.p0.recibido = FieldValue.serverTimestamp()
+      else campos.ultimoLatido = FieldValue.serverTimestamp()
+      batch.set(db.collection('graderEspejoEstado').doc(equipo), campos, { merge: true })
       batch.update(llaveRef, { ultimoUso: FieldValue.serverTimestamp() })
       await batch.commit()
       let actualizar = null
@@ -1842,7 +1838,16 @@ exports.espejoGraderIngesta = onRequest(
       } catch (e) {
         logger.warn('espejoGraderIngesta: control de lectura en vivo ilegible', e?.code || e?.name || 'desconocido')
       }
-      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false, ...(actualizar ? { actualizar } : {}), ...(vivo || {}) })
+      // e1.10: pedido manual de Puerta 0 (graderEspejoPedidoP0/{linea}). Sin caché, como el vivo.
+      let pedidoP0 = null
+      try {
+        const pp = await db.collection('graderEspejoPedidoP0').doc(linea).get()
+        const t = pp.exists ? pp.data().pedidoEn : null
+        pedidoP0 = espejoGraderMod.pedidoP0Vigente(t && typeof t.toMillis === 'function' ? t.toMillis() : null, Date.now())
+      } catch (e) {
+        logger.warn('espejoGraderIngesta: pedido de Puerta 0 ilegible', e?.code || e?.name || 'desconocido')
+      }
+      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false, ...(actualizar ? { actualizar } : {}), ...(vivo || {}), ...(pedidoP0 || {}) })
     } catch (e) {
       logger.error('espejoGraderIngesta error', prefijo, e?.code || e?.name || 'desconocido')
       return res.status(500).json({ ok: false, error: 'interno' })

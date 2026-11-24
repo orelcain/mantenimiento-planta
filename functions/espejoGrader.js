@@ -252,7 +252,40 @@ function conteoPorHora(docs) {
   return out
 }
 
+// e1.10: pedido manual de Puerta 0 («Actualizar causas P0» en el monitor). El monitor escribe
+// graderEspejoPedidoP0/{linea}.pedidoEn (hora del servidor); la función lo devuelve en la respuesta de cada envío como
+// `p0Pedido` y el lector lo atiende UNA vez (guarda el último atendido). Un pedido de más de 1 h ya no vale: el lector
+// lo habría tomado o la lectura periódica ya pasó.
+const PEDIDO_P0_MAX_MS = 60 * 60 * 1000
+
+/**
+ * Pedido de Puerta 0 vigente. `pedidoEnMs` = pedidoEn del documento (ms). Devuelve `{ p0Pedido: ISO }` (el lector lo
+ * usa como identificador, no como hora) o `null` si no hay pedido o tiene más de 1 h. Un minuto de holgura hacia
+ * adelante cubre la diferencia entre la hora de Firestore y la de la función.
+ * @returns {{p0Pedido: string} | null}
+ */
+function pedidoP0Vigente(pedidoEnMs, ahoraMs) {
+  if (typeof pedidoEnMs !== 'number' || !Number.isFinite(pedidoEnMs)) return null
+  if (typeof ahoraMs !== 'number' || !Number.isFinite(ahoraMs)) return null
+  const edad = ahoraMs - pedidoEnMs
+  if (edad < -60 * 1000 || edad > PEDIDO_P0_MAX_MS) return null
+  return { p0Pedido: new Date(pedidoEnMs).toISOString() }
+}
+
+/**
+ * Qué escribe un envío en `graderEspejoEstado/{equipo}`. El de pieza es el latido (informe, leidoEn, estado). El de
+ * Puerta 0 (e1.10) va en su propio campo `p0`: si pisara `estado`, el monitor perdería filasTabla, error y parcial del
+ * turno (los usa para «leído hasta»).
+ */
+function camposEstado({ equipo, linea, informe, leidoEn, estado, prefijo }) {
+  if (informe === 'p0') return { equipo, linea, p0: { leidoEn, estado }, llave: prefijo }
+  return { equipo, linea, leidoEn, informe, estado, llave: prefijo }
+}
+
 module.exports = {
+  PEDIDO_P0_MAX_MS,
+  pedidoP0Vigente,
+  camposEstado,
   MAX_CLAVES_ESTADO,
   MAX_FECHAS_CONTEOS,
   validarConteos,

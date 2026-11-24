@@ -18,6 +18,7 @@ import { resumirEspejo, type PiezaEspejo, type ResumenEspejo } from './espejoFil
 import { CacheHorasEspejo, horasDeVentana, recortarAVentana } from './espejoCache'
 import { AgregadorMinutos, type CubetaMinuto } from './espejoMinutos'
 import type { ShoplogixShiftWindow } from '../graderSegmenter'
+import type { EstadoP0Lector } from './espejoP0'
 
 /** Línea del monitor → línea del espejo (el lector la guarda como «chonchi»). */
 export function lineaDelEspejo(lineId: string): string {
@@ -47,6 +48,14 @@ export interface EspejoGrader {
   minutos: number | null
 }
 
+/** Campo `p0` del estado (e1.10) → lectura de Puerta 0, o `null` si no hay. */
+function aEstadoP0(v: unknown): EstadoLector['p0'] {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const est = (o.estado && typeof o.estado === 'object' ? o.estado : {}) as EstadoP0Lector
+  return { leidoEn: typeof o.leidoEn === 'string' ? o.leidoEn : null, recibidoMs: aMs(o.recibido), estado: est }
+}
+
 /** Documento de `graderEspejoEstado` → `EstadoLector` (también lo usa Diagnóstico Matrix). */
 export function aEstado(id: string, x: Record<string, unknown>): EstadoLector {
   const est = (x.estado && typeof x.estado === 'object' ? x.estado : {}) as EstadoLector['estado']
@@ -56,6 +65,7 @@ export function aEstado(id: string, x: Record<string, unknown>): EstadoLector {
     ultimoLatidoMs: aMs(x.ultimoLatido),
     leidoEn: typeof x.leidoEn === 'string' ? x.leidoEn : null,
     informe: typeof x.informe === 'string' ? x.informe : null,
+    p0: aEstadoP0(x.p0),
     estado: est,
   }
 }
