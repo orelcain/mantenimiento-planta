@@ -16,6 +16,7 @@ import { Button, SegmentedControl } from '@/components/piel'
 import { LECTURA_CUERPO } from '@/components/piel/Lectura'
 import { Q, pctCambio } from './jackKnifePresentacion'
 import { JackKnifeGrafico } from './JackKnifeGrafico'
+import { JackKnifeBuscador, JackKnifeSinAviso } from './JackKnifeBuscador'
 import { JackKnifeLamina } from './JackKnifeLamina'
 import { exportarLamina } from '@/services/grader/jackKnifeExport'
 import { JackKnifeListas } from './JackKnifeListas'
@@ -552,6 +553,7 @@ export function JackKnifeCard({ plantSlug, planta }: {
               <p className="text-footnote text-muted-foreground">Detención atribuida a Mantención · {rangoTexto(turnos, win)}{previa && ' frente a ' + rangoTexto(turnos, previa)}</p>
             </div>}
             {!apple && previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
+            {esBitacora && <JackKnifeBuscador planta={plantSlug} turnos={turnos.slice(win.desde, win.hasta + 1)} onAnalizar={(causa) => setEscogiendoCausa(causa)} />}
             {apple ? (
               <JackKnifeLectura
                 calc={calc}
@@ -879,6 +881,7 @@ export function JackKnifeCard({ plantSlug, planta }: {
             </p>
             </details>
             {pdfEnCurso && <div style={{ position: 'fixed', left: -20000, top: 0 }} aria-hidden><JackKnifeLamina ref={laminaRef} calc={calc} informe={informe} turnos={turnos} fantasmas={fantasmas} planta={plantaTxt} ahoraTxt={rangoTexto(turnos, win)} antesTxt={previa ? rangoTexto(turnos, previa) : ''} minAntes={resumen?.minAntes} minAhora={nAhoraT ? calc.D / nAhoraT : 0} vista={VISTAS.find(v => v.value === vista)?.label ?? ''} limitesBase={limitesBase && !!antesCalc?.N} url={urlVista()} /></div>}
+            {esBitacora && <JackKnifeSinAviso planta={plantSlug} turnos={turnos.slice(win.desde, win.hasta + 1)} />}
           </>
         )}
     </>

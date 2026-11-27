@@ -186,6 +186,12 @@ export interface EventoBitacora {
   equipoCodigo?: string | null
   /** Repuestos usados (opcional). */
   repuestos?: RepuestoUsado[]
+  /** Componente afectado del Jack-Knife (p. ej. «expulsador»). Opcional; solo lo usa el buscador. */
+  componente?: string | null
+  /** N° de aviso SAP del trabajo, si ya existe. */
+  avisoSap?: string | null
+  /** Clave de la detención del Jack-Knife (`jk:planta:turno:inicioMs`) que origina el trabajo. */
+  jkClave?: string | null
   /**
    * En un PENDIENTE: cómo y dónde se cerró. `resuelto` = otro evento lo resolvió
    * (cuenta como cerrado por Mantención); `no-aplica` = se descartó con motivo.
