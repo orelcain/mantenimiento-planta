@@ -11,6 +11,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-27 · claude · Jack-Knife: buscador de componentes, registrar trabajo y cambios sin aviso SAP (v4.25.0)
+- Hecho: buscar «expulsador» junta comentarios de Knuro, Lógica y Pernos/Resortes (Chonchi: 16 detenciones, 270 min en 6 turnos); hoja que crea un evento de Bitácora prellenado (componente, repuestos SAP, N° aviso, clave `jk:`); lista de cambios de pieza sin aviso. No toca firestore.rules ni functions/.
+- Archivos: components/grader (JackKnifeBuscador, RegistrarTrabajoJKSheet, JackKnifeCard), services/shoplogix/buscadorComponente.ts, services/bitacora/trabajoDesdeJK.ts, fixture jk-chonchi-expulsador.json.
+- Verificación: ci-local 9/9, golden con datos reales, revisado con sesión real a 1280 y 375 px.
+- Estado: HECHO al mergear. Sigue: punto en el gráfico, máquina prellenada, foto (fuera de alcance).
+
 ## 2026-11-22 · claude · Monitor: Principal · Eviscerado / Filete y Yal como referencia (PR #1495)
 - Hecho: títulos calculados por `plantLineId`, selector agrupado por planta, Yal con la marca «Referencia»; el servidor entrega las 3 líneas desde una lista fija (`LINEAS_MONITOR_HERMANAS`) y Yal aparece en el dashboard y en la portada móvil.
 - Verificación: ci:local verde (6.696 tests de PWA), 10 + 15 tests nuevos y prueba de sabotaje.
