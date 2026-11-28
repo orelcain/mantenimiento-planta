@@ -65,7 +65,7 @@ interface Layout {
  * todos los marcadores, después cada etiqueta busca un sitio en anillos
  * alrededor de su punto. Si no cabe, el punto queda sin nombre (sigue en la lista).
  */
-export function calcularLayout(c: CalculoJK, W: number, sel: string | null, fantasmas: PuntoJK[] = []): Layout {
+export function calcularLayout(c: CalculoJK, W: number, sel: string | null, fantasmas: PuntoJK[] = [], extra: { ev: number; mttr: number } | null = null): Layout {
   const small = W < 560
   const H = Math.round(Math.min(640, Math.max(small ? 440 : 480, W * 0.5)))
   const L = small ? 44 : 56
@@ -74,8 +74,9 @@ export function calcularLayout(c: CalculoJK, W: number, sel: string | null, fant
   const B = 70
   const iw = W - L - R
   const ih = H - T - B
-  const [x0, x1] = dominioLog([...c.pts.map((p) => p.ev), ...fantasmas.map(p => p.ev), c.un].filter(v => v > 0), 0.7)
-  const [y0, y1] = dominioLog([...c.pts.map((p) => p.mttr), ...fantasmas.map(p => p.mttr), c.um].filter(v => v > 0), 0.3)
+  // `extra`: el punto de un componente buscado (SPEC_BUSCADOR_JACK_KNIFE_2 §1); entra al dominio como un punto más.
+  const [x0, x1] = dominioLog([...c.pts.map((p) => p.ev), ...fantasmas.map(p => p.ev), ...(extra ? [extra.ev] : []), c.un].filter(v => v > 0), 0.7)
+  const [y0, y1] = dominioLog([...c.pts.map((p) => p.mttr), ...fantasmas.map(p => p.mttr), ...(extra ? [extra.mttr] : []), c.um].filter(v => v > 0), 0.3)
   const sx = (v: number) => L + iw * Math.log(v / x0) / Math.log(x1 / x0)
   const sy = (v: number) => T + ih * (1 - Math.log(v / y0) / Math.log(y1 / y0))
   const ux = sx(c.un)

@@ -1,0 +1,1087 @@
+[
+ {
+  "machineId": "3cbc4c21-dff2-4136-94d5-42f3dff15a4e",
+  "machineName": "Evisceradora 1",
+  "machineType": "baader_142",
+  "states": [
+   {
+    "s": 1795643732745,
+    "e": 1795645413015,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795645413015,
+    "e": 1795645413017,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795645413017,
+    "e": 1795646433091,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646433091,
+    "e": 1795646433102,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646433102,
+    "e": 1795646478110,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646478110,
+    "e": 1795646493126,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646493126,
+    "e": 1795647153245,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647153245,
+    "e": 1795647168251,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795647168251,
+    "e": 1795647183251,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647183251,
+    "e": 1795654489119,
+    "type": "downtime",
+    "name": "Detencion",
+    "reason": "KNURO"
+   }
+  ]
+ },
+ {
+  "machineId": "6f76be97-6d45-47ad-8e9a-7450bc2af68c",
+  "machineName": "Evisceradora 3",
+  "machineType": "baader_142",
+  "states": [
+   {
+    "s": 1795643732745,
+    "e": 1795644872973,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795644872973,
+    "e": 1795644872991,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795644872991,
+    "e": 1795645638034,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795645638034,
+    "e": 1795645638037,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795645638037,
+    "e": 1795645788021,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795645788021,
+    "e": 1795645788024,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795645788024,
+    "e": 1795646028050,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646028050,
+    "e": 1795646028053,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646028053,
+    "e": 1795647393261,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647393261,
+    "e": 1795647708269,
+    "type": "break",
+    "name": "Detencion",
+    "reason": "EJERCICIO COMPENSATORIO - Paro"
+   },
+   {
+    "s": 1795647708269,
+    "e": 1795648608361,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648608361,
+    "e": 1795648608366,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795648608366,
+    "e": 1795649133442,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649133442,
+    "e": 1795649163435,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649163435,
+    "e": 1795649433471,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649433471,
+    "e": 1795649433474,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649433474,
+    "e": 1795649448474,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649448474,
+    "e": 1795649508506,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649508506,
+    "e": 1795649523506,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649523506,
+    "e": 1795649523510,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649523510,
+    "e": 1795649538510,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649538510,
+    "e": 1795649553514,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649553514,
+    "e": 1795650063626,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650063626,
+    "e": 1795650063636,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650063636,
+    "e": 1795650603685,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650603685,
+    "e": 1795650603692,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650603692,
+    "e": 1795651608703,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651608703,
+    "e": 1795651623703,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651623703,
+    "e": 1795652868900,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652868900,
+    "e": 1795652898881,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652898881,
+    "e": 1795653393986,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   }
+  ]
+ },
+ {
+  "machineId": "ce16a125-6b05-4ab8-acb7-56a123931cff",
+  "machineName": "Evisceradora 2",
+  "machineType": "baader_142",
+  "states": [
+   {
+    "s": 1795643372630,
+    "e": 1795644257840,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795644257840,
+    "e": 1795644257848,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795644257848,
+    "e": 1795644512873,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795644512873,
+    "e": 1795644662922,
+    "type": "downtime",
+    "name": "Detencion",
+    "reason": "ACUMULACION RECHAZO"
+   },
+   {
+    "s": 1795644662922,
+    "e": 1795644677922,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795644677922,
+    "e": 1795644677928,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795644677928,
+    "e": 1795645713026,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795645713026,
+    "e": 1795645713028,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795645713028,
+    "e": 1795645923045,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795645923045,
+    "e": 1795645923054,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795645923054,
+    "e": 1795646148040,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646148040,
+    "e": 1795646148044,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646148044,
+    "e": 1795646328064,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646328064,
+    "e": 1795646328072,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646328072,
+    "e": 1795646433091,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646433091,
+    "e": 1795646433102,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646433102,
+    "e": 1795646778174,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795646778174,
+    "e": 1795646838191,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795646838191,
+    "e": 1795647093242,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647093242,
+    "e": 1795647093245,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795647093245,
+    "e": 1795647138238,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647138238,
+    "e": 1795647138241,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795647138241,
+    "e": 1795647438264,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647438264,
+    "e": 1795647603275,
+    "type": "break",
+    "name": "Detencion",
+    "reason": "EJERCICIO COMPENSATORIO - Paro"
+   },
+   {
+    "s": 1795647603275,
+    "e": 1795647693279,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795647693279,
+    "e": 1795647693283,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795647693283,
+    "e": 1795648158293,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648158293,
+    "e": 1795648158295,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795648158295,
+    "e": 1795648308325,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648308325,
+    "e": 1795648308327,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795648308327,
+    "e": 1795648368341,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648368341,
+    "e": 1795648518345,
+    "type": "break",
+    "name": "Detencion",
+    "reason": "EJERCICIO COMPENSATORIO - Paro"
+   },
+   {
+    "s": 1795648518345,
+    "e": 1795648668385,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648668385,
+    "e": 1795648668394,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795648668394,
+    "e": 1795648983394,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795648983394,
+    "e": 1795649073442,
+    "type": "downtime",
+    "name": "Detencion",
+    "reason": "ACUMULACION RECHAZO"
+   },
+   {
+    "s": 1795649073442,
+    "e": 1795649583524,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649583524,
+    "e": 1795649583529,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649583529,
+    "e": 1795649673566,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649673566,
+    "e": 1795649673568,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795649673568,
+    "e": 1795649988621,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795649988621,
+    "e": 1795650093629,
+    "type": "downtime",
+    "name": "Detencion",
+    "reason": "ACUMULACION RECHAZO"
+   },
+   {
+    "s": 1795650093629,
+    "e": 1795650108629,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650108629,
+    "e": 1795650108632,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650108632,
+    "e": 1795650228628,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650228628,
+    "e": 1795650228633,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650228633,
+    "e": 1795650258637,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650258637,
+    "e": 1795650273647,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650273647,
+    "e": 1795650378661,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650378661,
+    "e": 1795650378662,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650378662,
+    "e": 1795650438653,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650438653,
+    "e": 1795650453669,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650453669,
+    "e": 1795650468669,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650468669,
+    "e": 1795650468671,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650468671,
+    "e": 1795650558679,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650558679,
+    "e": 1795650558682,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650558682,
+    "e": 1795650588684,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650588684,
+    "e": 1795650588685,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650588685,
+    "e": 1795650633692,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650633692,
+    "e": 1795650648705,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650648705,
+    "e": 1795650768752,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650768752,
+    "e": 1795650768756,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650768756,
+    "e": 1795650783756,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650783756,
+    "e": 1795650783766,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650783766,
+    "e": 1795650798766,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650798766,
+    "e": 1795650798773,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650798773,
+    "e": 1795650888767,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650888767,
+    "e": 1795650888768,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650888768,
+    "e": 1795650903768,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650903768,
+    "e": 1795650903770,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650903770,
+    "e": 1795650948763,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795650948763,
+    "e": 1795650963751,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795650963751,
+    "e": 1795651038754,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651038754,
+    "e": 1795651038757,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651038757,
+    "e": 1795651158731,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651158731,
+    "e": 1795651158736,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651158736,
+    "e": 1795651173736,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651173736,
+    "e": 1795651173739,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651173739,
+    "e": 1795651188739,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651188739,
+    "e": 1795651188746,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651188746,
+    "e": 1795651218750,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651218750,
+    "e": 1795651218756,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651218756,
+    "e": 1795651308733,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651308733,
+    "e": 1795651308737,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651308737,
+    "e": 1795651428753,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651428753,
+    "e": 1795651428755,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651428755,
+    "e": 1795651503723,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651503723,
+    "e": 1795651503727,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651503727,
+    "e": 1795651698732,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651698732,
+    "e": 1795651698737,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651698737,
+    "e": 1795651878756,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651878756,
+    "e": 1795651878764,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651878764,
+    "e": 1795651938770,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651938770,
+    "e": 1795651938780,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651938780,
+    "e": 1795651968786,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795651968786,
+    "e": 1795651968794,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795651968794,
+    "e": 1795652058804,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652058804,
+    "e": 1795652058819,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652058819,
+    "e": 1795652073819,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652073819,
+    "e": 1795652073823,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652073823,
+    "e": 1795652313835,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652313835,
+    "e": 1795652328838,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652328838,
+    "e": 1795652343838,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652343838,
+    "e": 1795652343845,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652343845,
+    "e": 1795652568884,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652568884,
+    "e": 1795652568886,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652568886,
+    "e": 1795652883893,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652883893,
+    "e": 1795652883895,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652883895,
+    "e": 1795652973897,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   },
+   {
+    "s": 1795652973897,
+    "e": 1795652973903,
+    "type": "downtime",
+    "name": "Micro Detencion",
+    "reason": ""
+   },
+   {
+    "s": 1795652973903,
+    "e": 1795653138927,
+    "type": "uptime",
+    "name": "Produciendo",
+    "reason": ""
+   }
+  ]
+ }
+]

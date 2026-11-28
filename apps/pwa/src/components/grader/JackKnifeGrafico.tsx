@@ -5,10 +5,17 @@ import { dec1 } from '@/utils/formatoNumeros'
 import { SIN_IMPUTAR, type CalculoJK, type PuntoJK } from '@/services/shoplogix/jackKnife'
 const COLOR_SIN = 'rgb(var(--cat-6-ink))'
 
+/** Componente buscado, en el gráfico: causas donde aparece (aro) y su punto (eventos × MTTR, escala de datos). */
+export interface ComponenteGrafico {
+  causas: ReadonlySet<string>
+  punto: { x: number; y: number } | null
+  etiqueta: string
+}
+
 const durS = (m: number) => m >= 90 ? dec1(m/60)+' h' : dec1(m)+' min'
 const plural = (n: number, uno: string, varios: string) => n === 1 ? uno : varios
-export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = [], elegirCausa = () => {}, anillos, lectura = false, enAtacar }: { calc: CalculoJK; ancho?: number; sel?: string | null; fantasmas?: PuntoJK[]; elegirCausa?: (k: string) => void; /** Causas con acción fuerte hecha: se marcan con un aro. */ anillos?: ReadonlySet<string>; /** Modo lectura (piel Apple): sin fondos de cuadrante, puntos neutros salvo «Atacar ahora». */ lectura?: boolean; enAtacar?: ReadonlySet<string> }) {
- const layout = useMemo(() => calc.pts.length ? calcularLayout(calc, ancho, sel, fantasmas) : null, [calc, ancho, sel, fantasmas])
+export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = [], elegirCausa = () => {}, anillos, lectura = false, enAtacar, componente = null }: { calc: CalculoJK; ancho?: number; sel?: string | null; fantasmas?: PuntoJK[]; elegirCausa?: (k: string) => void; /** Causas con acción fuerte hecha: se marcan con un aro. */ anillos?: ReadonlySet<string>; /** Modo lectura (piel Apple): sin fondos de cuadrante, puntos neutros salvo «Atacar ahora». */ lectura?: boolean; enAtacar?: ReadonlySet<string>; /** Componente buscado en el buscador (SPEC_BUSCADOR_JACK_KNIFE_2 §1). Sin él, el gráfico queda igual. */ componente?: ComponenteGrafico | null }) {
+ const layout = useMemo(() => calc.pts.length ? calcularLayout(calc, ancho, sel, fantasmas, componente?.punto ? { ev: componente.punto.x, mttr: componente.punto.y } : null) : null, [calc, ancho, sel, fantasmas, componente])
  if (!layout) return <p>Sin detenciones de Mantención con causa en esta ventana.</p>
  // Modo lectura: texto de 13 px reales (el viewBox mide lo mismo que el ancho pintado).
  const txt = lectura ? 'text-footnote' : 'text-caption'
@@ -92,6 +99,7 @@ export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = []
                     >
                       <title>{p.k}</title>
                       {conAccion && <circle cx={x} cy={y} r={rad + 5} fill="none" stroke="rgb(var(--accent))" strokeWidth={2.5} />}
+                      {componente?.causas.has(p.k) && <circle cx={x} cy={y} r={rad + 10} fill="none" stroke="rgb(var(--brand))" strokeWidth={1.5} strokeDasharray="3 3" />}
                       {lectura && sel === p.k && <circle cx={x} cy={y} r={rad + 5} fill="none" stroke="rgb(var(--brand-ink))" strokeWidth={2} />}
                       <circle cx={x} cy={y} r={rad} fill={color} className="stroke-card" strokeWidth={1.5} />
                       {etiqueta && (
@@ -100,5 +108,14 @@ export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = []
                     </g>
                   )
                 })}
+                {componente?.punto && (() => {
+                  const px = layout.sx(componente.punto.x), py = layout.sy(componente.punto.y)
+                  return (
+                    <g>
+                      <circle cx={px} cy={py} r={6} fill="rgb(var(--brand))" className="stroke-card" strokeWidth={1.5} />
+                      <text x={px + 10} y={py + 4} className="fill-foreground text-caption font-semibold">{componente.etiqueta}</text>
+                    </g>
+                  )
+                })()}
               </svg>)
 }

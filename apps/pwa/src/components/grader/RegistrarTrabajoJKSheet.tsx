@@ -15,6 +15,9 @@ import type { RepuestoUsado } from '@/services/bitacora/bitacora.types'
 import { RepuestosUsados } from '@/components/bitacora/RepuestosUsados'
 import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
+import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { PLANT_MACHINES, type PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { maquinasCandidatas, type MaquinaDelTurno } from '@/services/shoplogix/maquinasCandidatas'
 
 /** Una detención del Jack-Knife, tal como la ve la hoja. */
 export interface DetencionParaTrabajo {
@@ -38,6 +41,10 @@ export interface RegistrarTrabajoJKSheetProps {
   sugerencias: readonly string[]
   /** Se llama al guardar, para refrescar la línea de tiempo. */
   onGuardado?: () => void
+  /** Planta de Shoplogix del Jack-Knife. Por omisión, Chonchi (la única con Bitácora hoy). */
+  planta?: string
+  /** Lee las máquinas del turno. Por omisión, `loadShoplogixShift`; en tests se inyecta. */
+  cargarMaquinas?: (dateKey: string, shiftId: string, planta: string) => Promise<MaquinaDelTurno[]>
 }
 
 const hhmm = (ms: number) => {
@@ -47,7 +54,19 @@ const hhmm = (ms: number) => {
 const ddmm = (dk: string) => `${dk.slice(8, 10)}-${dk.slice(5, 7)}`
 const OTRO = '__otro__'
 
-export function RegistrarTrabajoJKSheet({ open, onClose, detencion, sugerencias, onGuardado }: RegistrarTrabajoJKSheetProps) {
+/** Máquinas del turno con sus states, en la forma que lee `maquinasCandidatas` (ms). */
+async function cargarMaquinasDelTurno(dateKey: string, shiftId: string, planta: string): Promise<MaquinaDelTurno[]> {
+  const r = await loadShoplogixShift(dateKey, shiftId, planta as PlantSlug)
+  return (r.snapshot?.machines ?? []).map((m) => ({
+    machineName: m.machineName,
+    states: m.states.map((s) => ({ s: s.startAt.getTime(), e: s.endAt.getTime(), reason: s.reason, name: s.name })),
+  }))
+}
+
+export function RegistrarTrabajoJKSheet({
+  open, onClose, detencion, sugerencias, onGuardado,
+  planta = 'chonchi', cargarMaquinas = cargarMaquinasDelTurno,
+}: RegistrarTrabajoJKSheetProps) {
   const id = useId()
   const [equipo, setEquipo] = useState('')
   const [componente, setComponente] = useState<string | null>(null)
@@ -57,6 +76,8 @@ export function RegistrarTrabajoJKSheet({ open, onClose, detencion, sugerencias,
   const [aviso, setAviso] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  /** Máquinas que marcaron esta causa en esa hora: null = leyendo; [] = ninguna o error. */
+  const [candidatas, setCandidatas] = useState<string[] | null>(null)
 
   // Al abrir con otra detención, se reinicia el formulario con sus datos.
   const claveDetencion = detencion ? `${detencion.turnoJkId}|${detencion.inicioMs}` : ''
@@ -74,11 +95,35 @@ export function RegistrarTrabajoJKSheet({ open, onClose, detencion, sugerencias,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, claveDetencion])
 
+  // Preselección: una sola candidata la elige; si el técnico ya escribió algo, no se pisa. No bloquea nada.
+  useEffect(() => {
+    if (!open || !detencion) return
+    let vivo = true
+    setCandidatas(null)
+    cargarMaquinas(detencion.dateKey, detencion.shiftId, planta)
+      .then((maquinas) => {
+        if (!vivo) return
+        const c = maquinasCandidatas(maquinas, detencion.causa, detencion.inicioMs, detencion.min)
+        setCandidatas(c)
+        if (c.length === 1) setEquipo((prev) => (prev.trim() ? prev : c[0]!))
+      })
+      .catch(() => {
+        if (vivo) setCandidatas([])
+      })
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, claveDetencion])
+
   if (!detencion) return null
 
   const titulo = `${detencion.causa} detuvo la línea ${Math.round(detencion.min)} min`
   const subtitulo = `${BITACORA_PLANTA.nombre} · ${ddmm(detencion.dateKey)} · ${detencion.shiftId}`
   const componenteFinal = componente === OTRO ? componenteOtro.trim() : (componente ?? '')
+  const maquinasDeLinea = PLANT_MACHINES[planta as PlantSlug]?.map((m) => m.name) ?? []
+  // Con varias candidatas: solo esas. Con una: ya va elegida, sin chips. Sin candidatas, leyendo o con error: toda la línea.
+  const opcionesMaquina = candidatas && candidatas.length > 1 ? candidatas : candidatas?.length === 1 ? [] : maquinasDeLinea
 
   const guardar = () => {
     setError(null)
@@ -140,6 +185,15 @@ export function RegistrarTrabajoJKSheet({ open, onClose, detencion, sugerencias,
             className="min-h-[44px] rounded-ctl bg-muted px-3 text-body text-foreground"
           />
         </label>
+        {opcionesMaquina.length > 0 && (
+          <div className="-mt-2 flex flex-wrap gap-2" role="group" aria-label="Máquinas">
+            {opcionesMaquina.map((m) => (
+              <button key={m} type="button" aria-pressed={equipo === m} onClick={() => setEquipo(m)} className="min-h-[44px] rounded-ctl bg-muted px-3 text-subhead text-foreground aria-[pressed=true]:bg-primary/[0.13] aria-[pressed=true]:font-semibold aria-[pressed=true]:text-primary">
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-footnote font-semibold text-muted-foreground">¿Qué componente fue?</legend>

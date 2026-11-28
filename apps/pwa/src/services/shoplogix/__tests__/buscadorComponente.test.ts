@@ -6,6 +6,7 @@ import {
   buscarComponente,
   cambiosSinAviso,
   fechaDeCambio,
+  puntoDeComponente,
   terminosDe,
 } from '../buscadorComponente'
 
@@ -122,5 +123,17 @@ describe('regla del cruce · distancia a la detención (sintético)', () => {
   it('causa distinta no se asigna aunque esté cerca', () => {
     const r = buscarComponente([turno(T0, 'Lógica')], [], 'expulsador')
     expect(r.totalDetenciones).toBe(0)
+  })
+})
+
+describe('puntoDeComponente · «expulsador» (fixture real)', () => {
+  it('16 detenciones y MTTR ≈ 16,9 min (≈270 min / 16)', () => {
+    const p = puntoDeComponente(buscarComponente(turnos, [], 'expulsador'))
+    expect(p?.x).toBe(16)
+    expect(p?.y).toBeCloseTo(16.9, 1)
+    expect(Math.round(p!.y * 10) / 10).toBe(16.9)
+  })
+  it('sin detenciones no hay punto (escala logarítmica)', () => {
+    expect(puntoDeComponente(buscarComponente(turnos, [], 'zzqx'))).toBeNull()
   })
 })

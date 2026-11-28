@@ -16,8 +16,10 @@ import {
   buscarComponente,
   cambiosSinAviso,
   fechaDeCambio,
+  puntoDeComponente,
   type FilaComponente,
 } from '@/services/shoplogix/buscadorComponente'
+import type { ComponenteGrafico } from './JackKnifeGrafico'
 import { RegistrarTrabajoJKSheet, type DetencionParaTrabajo } from './RegistrarTrabajoJKSheet'
 import { cn } from '@/lib/utils'
 
@@ -92,9 +94,11 @@ export interface JackKnifeBuscadorProps {
   turnos: readonly TurnoJK[]
   /** Abre el análisis de causa raíz de esa causa (mismo flujo que el ACR de la página). */
   onAnalizar?: (causa: string) => void
+  /** Avisa al gráfico del componente buscado (causas con aro y punto); `null` al vaciar la búsqueda o al salir. */
+  onComponente?: (c: ComponenteGrafico | null) => void
 }
 
-export function JackKnifeBuscador({ planta, turnos, onAnalizar }: JackKnifeBuscadorProps) {
+export function JackKnifeBuscador({ planta, turnos, onAnalizar, onComponente }: JackKnifeBuscadorProps) {
   const id = useId()
   const [consulta, setConsulta] = useState('')
   const [registrar, setRegistrar] = useState<DetencionParaTrabajo | null>(null)
@@ -105,6 +109,12 @@ export function JackKnifeBuscador({ planta, turnos, onAnalizar }: JackKnifeBusca
   const maxMin = Math.max(1, ...r.filas.map((f) => f.detenciones.reduce((s, d) => s + d[2], 0)))
   const otrosTerminos = r.terminos.slice(1)
   const causaPrincipal = r.causas[0]?.causa ?? null
+  const componenteGrafico = useMemo<ComponenteGrafico | null>(
+    () => (hay && r.causas.length > 0 ? { causas: new Set(r.causas.map((c) => c.causa)), punto: puntoDeComponente(r), etiqueta: consulta.trim() } : null),
+    [r, hay, consulta],
+  )
+  useEffect(() => { onComponente?.(componenteGrafico) }, [componenteGrafico, onComponente])
+  useEffect(() => () => onComponente?.(null), [onComponente])
 
   return (
     <section aria-label="Buscar componente en el Jack-Knife" className="flex flex-col gap-4 rounded-card bg-card p-4 lg:p-6">
@@ -196,6 +206,7 @@ export function JackKnifeBuscador({ planta, turnos, onAnalizar }: JackKnifeBusca
         onClose={() => setRegistrar(null)}
         detencion={registrar}
         sugerencias={registrar ? sugerenciasDeCausa(turnos, registrar.causa) : []}
+        planta={planta}
       />
     </section>
   )
@@ -303,6 +314,7 @@ export function JackKnifeSinAviso({ planta, turnos }: JackKnifeSinAvisoProps) {
         onClose={() => setRegistrar(null)}
         detencion={registrar}
         sugerencias={registrar ? sugerenciasDeCausa(turnos, registrar.causa) : []}
+        planta={planta}
       />
     </section>
   )

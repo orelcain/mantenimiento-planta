@@ -270,3 +270,15 @@ export function cambiosSinAviso(turnos: readonly TurnoJK[], trabajos: readonly E
 
   return out.sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0))
 }
+
+// ── Punto del componente en el gráfico ──────────────────────────────────────
+
+/**
+ * Punto del componente en la escala del Jack-Knife: x = eventos en el período (conteo crudo, como `PuntoJK.ev`),
+ * y = MTTR (minutos medios por detención). `null` sin detenciones (la escala es logarítmica).
+ * No hace falta el nº de turnos: el eje x ya es conteo del período, no por turno.
+ */
+export function puntoDeComponente(r: ResultadoBuscador): { x: number; y: number } | null {
+  if (r.totalDetenciones <= 0) return null
+  return { x: r.totalDetenciones, y: r.totalMin / r.totalDetenciones }
+}
