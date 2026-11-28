@@ -26,7 +26,7 @@ import {
   type FilaLecturaJK,
   type TramoLectura,
 } from '@/services/shoplogix/jackKnifeLectura'
-import { JackKnifeGrafico } from './JackKnifeGrafico'
+import { JackKnifeGrafico, type ComponenteGrafico } from './JackKnifeGrafico'
 import { AtacarAhoraLectura } from './JackKnifeListas'
 import { TJK_BOTON, TJK_BOTON_PRI, TJK_CUERPO, TJK_ENLACE, TJK_NOTA, TJK_SECCION, TJK_SEG, TJK_TITULO, claseSegmento } from './jackKnifeTablero'
 
@@ -172,6 +172,8 @@ export interface JackKnifeLecturaProps {
   /** Puntos de la causa en el período de comparación (null sin comparación). */
   antesPts?: readonly PuntoJK[] | null
   anillos?: ReadonlySet<string>
+  /** Componente buscado: aro en sus causas y punto en el gráfico. */
+  componente?: ComponenteGrafico | null
   analisis?: ReadonlyMap<string, ResumenCausaJK>
   onAnalizar?: (causa: string) => void
   preset: VentanaJK | 'libre'
@@ -303,6 +305,7 @@ export function JackKnifeLectura(p: JackKnifeLecturaProps) {
                 fantasmas={p.fantasmas}
                 elegirCausa={elegir}
                 anillos={p.anillos}
+                componente={p.componente}
                 lectura
                 enAtacar={enAtacar}
               />
@@ -467,6 +470,7 @@ export function JackKnifeLectura(p: JackKnifeLecturaProps) {
               fantasmas={p.fantasmas}
               elegirCausa={elegir}
               anillos={p.anillos}
+                componente={p.componente}
               lectura
               enAtacar={enAtacar}
             />

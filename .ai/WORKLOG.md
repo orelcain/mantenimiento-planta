@@ -11,6 +11,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-27 · claude · Jack-Knife 2a vuelta: punto en el gráfico, máquina prellenada, hora sin -3 h (v4.26.0)
+- Hecho: punto azul (--brand) + aro punteado en causas con el componente (también piel Apple); máquina prellenada desde machines del turno (maquinasCandidatas); fechaHoraJK con getters UTC (comentarios mostraban 3 h menos).
+- Archivos: components/grader (JackKnifeGrafico/Card/Lectura/Buscador, RegistrarTrabajoJKSheet, jackKnifeLayout), services/shoplogix (buscadorComponente, maquinasCandidatas, fechaHoraJK).
+- Verificación: ci-local 9/9 antes del bump; PR con CI "build".
+- Estado: HECHO al mergear. Sigue: foto en Registrar trabajo (subirFoto necesita id de evento).
+
 ## 2026-11-27 · claude · Jack-Knife: buscador de componentes, registrar trabajo y cambios sin aviso SAP (v4.25.0)
 - Hecho: buscar «expulsador» junta comentarios de Knuro, Lógica y Pernos/Resortes (Chonchi: 16 detenciones, 270 min en 6 turnos); hoja que crea un evento de Bitácora prellenado (componente, repuestos SAP, N° aviso, clave `jk:`); lista de cambios de pieza sin aviso. No toca firestore.rules ni functions/.
 - Archivos: components/grader (JackKnifeBuscador, RegistrarTrabajoJKSheet, JackKnifeCard), services/shoplogix/buscadorComponente.ts, services/bitacora/trabajoDesdeJK.ts, fixture jk-chonchi-expulsador.json.

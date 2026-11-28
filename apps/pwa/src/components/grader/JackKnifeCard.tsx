@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils'
 import { Button, SegmentedControl } from '@/components/piel'
 import { LECTURA_CUERPO } from '@/components/piel/Lectura'
 import { Q, pctCambio } from './jackKnifePresentacion'
-import { JackKnifeGrafico } from './JackKnifeGrafico'
+import { JackKnifeGrafico, type ComponenteGrafico } from './JackKnifeGrafico'
+import { fechaHoraJK, MESES_ABR } from '@/services/shoplogix/fechaHoraJK'
 import { JackKnifeBuscador, JackKnifeSinAviso } from './JackKnifeBuscador'
 import { JackKnifeLamina } from './JackKnifeLamina'
 import { exportarLamina } from '@/services/grader/jackKnifeExport'
@@ -63,7 +64,7 @@ import {
 
 // ── Presentación ────────────────────────────────────────────────────────────
 
-const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
+const MES = MESES_ABR
 
 /** Colores de cuadrante: tinta para el texto, punto para el marcador, relleno de baja opacidad. */
 /** Etiqueta corta en pantallas angostas; el texto largo sigue siendo el nombre accesible. */
@@ -155,11 +156,6 @@ const MODOS: { value: ModoCmpJK; label: ReactNode }[] = [
 // Riel: manijas «Antes» en color de advertencia suave (solo en «Elegir a mano»).
 const RANGO_INPUT_ANTES = RANGO_INPUT.replace(/border-accent/g, 'border-warning')
 
-/** Fecha y hora de un comentario: «7-nov 14:05». */
-const fechaHora = (ms: number) => {
-  const d = new Date(ms)
-  return `${d.getDate()}-${MES[d.getMonth()]} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
 
 interface ComentarioVista { dateKey: string; shiftId: string; inicioMs: number; texto: string }
 
@@ -180,12 +176,12 @@ function ComentariosCausa({ causa, todos, busqueda, onBusqueda, palabra, onPalab
     ? agruparComentarios(filtrados).map((g) => ({
       clave: g.texto,
       texto: g.texto,
-      cola: `${g.n > 1 ? `×${g.n} · ` : ''}${fechaHora(g.ultimoMs)}`,
+      cola: `${g.n > 1 ? `×${g.n} · ` : ''}${fechaHoraJK(g.ultimoMs)}`,
     }))
     : [...filtrados].sort((a, b) => b.inicioMs - a.inicioMs).map((c) => ({
       clave: `${c.inicioMs}-${c.texto}`,
       texto: c.texto,
-      cola: `${fechaHora(c.inicioMs)} · ${turnoCorto(c.shiftId)}`,
+      cola: `${fechaHoraJK(c.inicioMs)} · ${turnoCorto(c.shiftId)}`,
     }))
 
   return (
@@ -261,6 +257,8 @@ export function JackKnifeCard({ plantSlug, planta }: {
   const [modoCmp, setModoCmp] = useState<ModoCmpJK>(inicial?.cmp ?? 'ant')
   const [manualAntes, setManualAntes] = useState<RangoJK | null>(null)
   const [sel, setSel] = useState<string | null>(inicial?.causa ?? null)
+  /** Componente buscado en el buscador: aro en sus causas y punto en el gráfico. */
+  const [componente, setComponente] = useState<ComponenteGrafico | null>(null)
   /** Análisis de causa raíz (solo en la planta de Bitácora): una lectura, caché de 15 min. */
   const [acrs, setAcrs] = useState<Acr[]>([])
   const [busqueda, setBusqueda] = useState('')
@@ -346,6 +344,8 @@ export function JackKnifeCard({ plantSlug, planta }: {
     const hasta = Math.min(Math.max(manual.hasta, desde), n - 1)
     return { desde, hasta }
   }, [turnos, preset, manual, n])
+  // Memoizado: el buscador emite su resultado por `useMemo`; un array nuevo en cada render haría un bucle.
+  const turnosVentanaBuscador = useMemo(() => turnos.slice(win.desde, win.hasta + 1), [turnos, win.desde, win.hasta])
 
   const calcActual = useMemo(
     () => calcularJackKnife(turnos, win.desde, win.hasta, vista),
@@ -553,7 +553,7 @@ export function JackKnifeCard({ plantSlug, planta }: {
               <p className="text-footnote text-muted-foreground">Detención atribuida a Mantención · {rangoTexto(turnos, win)}{previa && ' frente a ' + rangoTexto(turnos, previa)}</p>
             </div>}
             {!apple && previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
-            {esBitacora && <JackKnifeBuscador planta={plantSlug} turnos={turnos.slice(win.desde, win.hasta + 1)} onAnalizar={(causa) => setEscogiendoCausa(causa)} />}
+            {esBitacora && <JackKnifeBuscador planta={plantSlug} turnos={turnosVentanaBuscador} onAnalizar={(causa) => setEscogiendoCausa(causa)} onComponente={setComponente} />}
             {apple ? (
               <JackKnifeLectura
                 calc={calc}
@@ -570,6 +570,7 @@ export function JackKnifeCard({ plantSlug, planta }: {
                 onVerDetalle={verDetalleCausa}
                 antesPts={antesCalc?.pts ?? null}
                 anillos={esBitacora ? anillos : undefined}
+                componente={esBitacora ? componente : null}
                 analisis={esBitacora ? analisis : undefined}
                 onAnalizar={esBitacora ? (causa) => setEscogiendoCausa(causa) : undefined}
                 preset={preset}
@@ -591,7 +592,7 @@ export function JackKnifeCard({ plantSlug, planta }: {
               />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-              <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} anillos={esBitacora ? anillos : undefined} />
+              <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} anillos={esBitacora ? anillos : undefined} componente={esBitacora ? componente : null} />
               <JackKnifeListas
                 calc={calc}
                 informe={informe}
